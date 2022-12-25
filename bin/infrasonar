@@ -370,7 +370,8 @@ def sanity_check(data: dict, allow_unknown_collectors: bool):
 
 
 async def upsert_asset(api: str, token: str, asset: dict,
-                       verify_ssl: bool, verbose: bool):
+                       verify_ssl: bool, verbose: bool,
+                       container_id: int):
     name = asset['name']
     url = _join(api, f'asset/{name}/id')
     async with ClientSession(headers=_headers(token)) as session:
@@ -450,7 +451,7 @@ async def upsert_asset(api: str, token: str, asset: dict,
                     raise Exception(f'{msg} (error code: {r.status})')
 
 
-async def async_upsert_assets(api: str, token: str, assets: list,
+async def async_upsert_assets(api: str, token: str, assets: list, labels: dict,
                               verify_ssl: bool, verbose: bool):
     url = _join(api, 'container/id')
     async with ClientSession(headers=_headers(token)) as session:
@@ -464,8 +465,24 @@ async def async_upsert_assets(api: str, token: str, assets: list,
                 print(f'Container id: {conainer_id}')
                 await asyncio.sleep(1)
 
+    for name, label_id in labels.items():
+        url = _join(api, f'label/{label_id}?fields=name')
+        async with ClientSession(headers=_headers(token)) as session:
+            async with session.get(url, ssl=verify_ssl) as r:
+                if r.status != 200:
+                    msg = await r.text()
+                    raise Exception(f'{msg} (error code: {r.status})')
+                resp = await r.json()
+                lname = resp['name']
+                if verbose:
+                    print(f'Label "{name}" ({label_id}) actual name: {lname}')
+
+    if labels and verbose:
+        await asyncio.sleep(3)
+
     for asset in assets:
-        await upsert_asset(asset, token)
+        await upsert_asset(
+            api, token, asset, verify_ssl, verbose, container_id)
 
 
 def upsert_assets(filename: str, api: str, verify_ssl: bool, verbose: bool,
@@ -482,12 +499,13 @@ def upsert_assets(filename: str, api: str, verify_ssl: bool, verbose: bool,
 
     sanity_check(data, allow_unknown_collectors)
 
+    labels = data.get('labels', {})
     assets = data.get('assets')
     token = data['token']
     if assets:
         try:
             asyncio.run(async_upsert_assets(
-                api, token, assets, verify_ssl, verbose))
+                api, token, assets, labels, verify_ssl, verbose))
         except Exception as e:
             msg = str(e) or type(e).__name__
             print(msg)
