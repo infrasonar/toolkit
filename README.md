@@ -15,3 +15,28 @@ Or, clone this project and use the setup
 ```shell
 python setup.py install
 ```
+
+## Upsert assets
+
+Create a _yaml_ file, for example: `assets.yaml`
+
+```yaml
+labels:
+  windows: 3257
+
+configs:
+  tcp:
+    checkCertificatePorts: [443, 995, 993, 465, 3389, 989, 990, 636, 5986]
+
+assets:
+- name: foo.local
+  kind: Windows
+  labels: ["windows"]
+  collectors:
+  - key: lastseen
+  - key: ping
+  - key: tcp
+    config: tcp
+  - key: wmi
+```
+

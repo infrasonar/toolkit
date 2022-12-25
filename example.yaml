@@ -1,6 +1,5 @@
 labels:
-  windows: 123
-  linux: 456
+  windows: 3257
 
 configs:
   tcp:
@@ -11,14 +10,8 @@ assets:
   kind: Windows
   labels: ["windows"]
   collectors:
-  - key: ping
   - key: lastseen
-  - key: wmi
-- name: bar.local
-  kind: Linux
-  labels: ["linux"]
-  collectors:
   - key: ping
-  - key: lastseen
   - key: tcp
     config: tcp
+  - key: wmi

@@ -91,6 +91,17 @@ def _join(*parts):
     return '/'.join((part.strip('/') for part in parts))
 
 
+def _headers(token: str):
+    return {'Authorization': f'Bearer {token}'}
+
+
+def _json_headers(token: str):
+    return {
+        'Authorization': f'Bearer {token}',
+        'Content-Type': 'application/json'
+    }
+
+
 _yaml_keys = set(['token', 'labels', 'configs', 'assets'])
 _asset_keys = set(['name', 'kind', 'labels', 'collectors'])
 _collector_keys = set(['key', 'config'])
@@ -306,6 +317,8 @@ def check_asset(asset: dict, labels: dict, configs: dict,
             if label not in labels:
                 sys.exit(f'Asset label "{label}" missing in labels')
             asset_labels[idx] = labels[label]
+    else:
+        asset['labels'] = []
 
     collectors = asset.get('collectors')
     if collectors is not None:
@@ -314,6 +327,8 @@ def check_asset(asset: dict, labels: dict, configs: dict,
             sys.exit(_collectors_example)
         for collector in collectors:
             check_collector(collector, configs, allow_unknown_collectors)
+    else:
+        asset['collectors'] = []
 
 
 def sanity_check(data: dict, allow_unknown_collectors: bool):
@@ -354,21 +369,104 @@ def sanity_check(data: dict, allow_unknown_collectors: bool):
         check_asset(asset, labels, configs, allow_unknown_collectors)
 
 
-async def upsert_asset(asset: dict):
+async def upsert_asset(api: str, token: str, asset: dict,
+                       verify_ssl: bool, verbose: bool):
     name = asset['name']
+    url = _join(api, f'asset/{name}/id')
+    async with ClientSession(headers=_headers(token)) as session:
+        async with session.get(url, ssl=verify_ssl) as r:
+            if r.status == 404:
+                asset_id = None
+            elif r.status != 200:
+                msg = await r.text()
+                raise Exception(f'{msg} (error code: {r.status})')
+            else:
+                resp = await r.json()
+                asset_id = resp['assetId']
+
+    if asset_id is None:
+        if verbose:
+            print(f'Create a new asset for "{name}"...')
+            await asyncio.sleep(2)
+        url = _join(api, f'container/{container_id}/asset')
+        data = {"name": name}
+        async with ClientSession(headers=_json_headers(token)) as session:
+            async with session.post(url, json=data, ssl=verify_ssl) as r:
+                if r.status != 201:
+                    msg = await r.text()
+                    raise Exception(f'{msg} (error code: {r.status})')
+                resp = await r.json()
+                asset_id = resp['assetId']
+        if verbose:
+            print(f'New asset id for "{name}": {asset_id}')
+    elif verbose:
+        print(f'Existing asset id for "{name}": {asset_id}')
+
+    kind = asset.get('kind')
+    if kind is not None:
+        if verbose:
+            print(f'Set kind "{kind}" for asset "{name}" ({asset_id})')
+        await asyncio.sleep(0.5)
+        data = {"kind": kind}
+        url = _join(api, f'asset/{asset_id}/kind')
+        async with ClientSession(headers=_json_headers(token)) as session:
+            async with session.patch(url, json=data, ssl=verify_ssl) as r:
+                if r.status != 204:
+                    msg = await r.text()
+                    raise Exception(f'{msg} (error code: {r.status})')
+
+    collectors = asset['collectors']
+    for collector in collectors:
+        key = collector['key']
+        if verbose:
+            print(f'Set collector "{key}" for asset "{name}" ({asset_id})')
+        await asyncio.sleep(0.5)
+        config = collector.get('config')
+        url = _join(self.api_uri, f'asset/{asset_id}/collector/{key}')
+        if config is None:
+            async with ClientSession(headers=_headers(token)) as session:
+                async with session.post(url, ssl=verify_ssl) as r:
+                    if r.status != 204:
+                        msg = await r.text()
+                        raise Exception(f'{msg} (error code: {r.status})')
+        else:
+            data = {'config': config}
+            async with ClientSession(headers=_json_headers(token)) as session:
+                async with session.post(url, json=data, ssl=verify_ssl) as r:
+                    if r.status != 204:
+                        msg = await r.text()
+                        raise Exception(f'{msg} (error code: {r.status})')
+
+    labes = asset['labels']
+    for label_id in labels:
+        if verbose:
+            print(f'Set label id {label_id} for asset "{name}" ({asset_id})')
+        await asyncio.sleep(0.5)
+        url = _join(self.api_uri, f'asset/{asset_id}/label/{label_id}')
+        async with ClientSession(headers=_headers(token)) as session:
+            async with session.post(url, ssl=verify_ssl) as r:
+                if r.status != 204:
+                    msg = await r.text()
+                    raise Exception(f'{msg} (error code: {r.status})')
 
 
 async def async_upsert_assets(api: str, token: str, assets: list,
                               verify_ssl: bool, verbose: bool):
-    url = _join(self.api_uri, 'container/id')
-    async with ClientSession(headers=self._get_headers) as session:
-        async with session.get(url, ssl=self.verify_ssl) as r:
+    url = _join(api, 'container/id')
+    async with ClientSession(headers=_headers(token)) as session:
+        async with session.get(url, ssl=verify_ssl) as r:
             if r.status != 200:
                 msg = await r.text()
                 raise Exception(f'{msg} (error code: {r.status})')
+            resp = await r.json()
+            container_id = resp['containerId']
+            if verbose:
+                print(f'Container id: {conainer_id}')
+                await asyncio.sleep(1)
 
     for asset in assets:
-        await
+        await upsert_asset(asset, token)
+
 
 def upsert_assets(filename: str, api: str, verify_ssl: bool, verbose: bool,
                   allow_unknown_collectors: bool):
@@ -396,7 +494,6 @@ def upsert_assets(filename: str, api: str, verify_ssl: bool, verbose: bool,
 
     if verbose:
         print(f'Finished upserting {len(assets)} asset(s)')
-
 
 
 if __name__ == '__main__':
