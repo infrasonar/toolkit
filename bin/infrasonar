@@ -287,7 +287,7 @@ def check_collector(collector: dict, configs: dict,
 
 
 def check_asset(asset: dict, labels: dict, configs: dict,
-                allow_unknown_collectors: bool):
+                allow_unknown_collectors: bool, allow_unknown_kinds: bool):
     too_much = set(asset.keys()) - _asset_keys
     if too_much:
         sys.exit(f'Unexpected key in asset: "{too_much.pop()}"')
@@ -299,10 +299,11 @@ def check_asset(asset: dict, labels: dict, configs: dict,
         sys.exit('Asset name must be a string')
 
     kind = asset.get('kind')
-    if kind is not None and kind not in _kinds:
+    if kind is not None and kind not in _kinds and not allow_unknown_kinds:
         sys.exit(
             f'Invalid asset kind: "{kind}" '
-            f'(must be one of: {", ".join(_kinds)})')
+            f'(must be one of: {", ".join(_kinds)} or '
+            'use --allow-unknown-kinds)')
 
     asset_labels = asset.get('labels')
     if asset_labels is not None:
@@ -331,7 +332,8 @@ def check_asset(asset: dict, labels: dict, configs: dict,
         asset['collectors'] = []
 
 
-def sanity_check(data: dict, allow_unknown_collectors: bool):
+def sanity_check(data: dict, allow_unknown_collectors: bool,
+                 allow_unknown_kinds: bool):
     too_much = set(data.keys()) - _yaml_keys
     if too_much:
         sys.exit(f'Unexpected key in yaml: "{too_much.pop()}"')
@@ -366,7 +368,12 @@ def sanity_check(data: dict, allow_unknown_collectors: bool):
         sys.exit(_assets_example)
 
     for asset in assets:
-        check_asset(asset, labels, configs, allow_unknown_collectors)
+        check_asset(
+            asset,
+            labels,
+            configs,
+            allow_unknown_collectors,
+            allow_unknown_kinds)
 
 
 async def upsert_asset(api: str, token: str, asset: dict,
@@ -486,7 +493,7 @@ async def async_upsert_assets(api: str, token: str, assets: list, labels: dict,
 
 
 def upsert_assets(filename: str, api: str, verify_ssl: bool, verbose: bool,
-                  allow_unknown_collectors: bool):
+                  allow_unknown_collectors: bool, allow_unknown_kinds: bool):
     try:
         with open(filename, 'r') as fp:
             data = yaml.safe_load(fp)
@@ -497,7 +504,7 @@ def upsert_assets(filename: str, api: str, verify_ssl: bool, verbose: bool,
     if not isinstance(data, dict):
         sys.exit('Expecting the yaml to conain a dict')
 
-    sanity_check(data, allow_unknown_collectors)
+    sanity_check(data, allow_unknown_collectors, allow_unknown_kinds)
 
     labels = data.get('labels', {})
     assets = data.get('assets')
@@ -542,7 +549,11 @@ if __name__ == '__main__':
     upsert.add_argument(
         '--allow-unknown-collectors',
         action='store_true',
-        help='Continue and upsert unknown collectors')
+        help='Allow collectors unknown to this tool')
+    upsert.add_argument(
+        '--allow-unknown-kinds',
+        action='store_true',
+        help='Allow kinds unknown to this tool')
 
     args = parser.parse_args()
 
@@ -556,4 +567,5 @@ if __name__ == '__main__':
             args.api,
             not args.skip_verify_ssl,
             args.verbose,
-            args.allow_unknown_collectors)
+            args.allow_unknown_collectors,
+            args.allow_unknown_kinds)
