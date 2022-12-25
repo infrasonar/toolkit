@@ -1,0 +1,24 @@
+labels:
+  windows: 123
+  linux: 456
+
+configs:
+  tcp:
+    checkCertificatePorts: [443, 995, 993, 465, 3389, 989, 990, 636, 5986]
+
+assets:
+- name: foo.local
+  kind: Windows
+  labels: ["windows"]
+  collectors:
+  - key: ping
+  - key: lastseen
+  - key: wmi
+- name: bar.local
+  kind: Linux
+  labels: ["linux"]
+  collectors:
+  - key: ping
+  - key: lastseen
+  - key: tcp
+    config: tcp
