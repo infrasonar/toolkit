@@ -549,11 +549,11 @@ if __name__ == '__main__':
     upsert.add_argument(
         '--allow-unknown-collectors',
         action='store_true',
-        help='Allow collectors unknown to this tool')
+        help='Allow collectors unknown to this toolkit')
     upsert.add_argument(
         '--allow-unknown-kinds',
         action='store_true',
-        help='Allow kinds unknown to this tool')
+        help='Allow kinds unknown to this toolkit')
 
     args = parser.parse_args()
 
