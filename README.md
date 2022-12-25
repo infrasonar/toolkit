@@ -40,3 +40,8 @@ assets:
   - key: wmi
 ```
 
+Next, use the following command to upsert the assets: _(-v for verbose output)_
+
+```bash
+infrasonar -v upsert-assets assets.yaml
+```

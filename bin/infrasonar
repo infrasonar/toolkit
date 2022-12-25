@@ -202,7 +202,7 @@ _collectors = {
         'address': _test_address,
     },
     'http': {
-        'uri': _test_url,
+        'uri': _test_uri,
         'timeout': _test_timeout,
         'verifySSL': partial(_test_bool, prop='verifySSL'),
         'withPayload': partial(_test_bool, prop='withPayload'),
@@ -542,7 +542,7 @@ if __name__ == '__main__':
     upsert.add_argument(
         '--allow-unknown-collectors',
         action='store_true',
-        help='Allow unknown collectors')
+        help='Continue and upsert unknown collectors')
 
     args = parser.parse_args()
 
