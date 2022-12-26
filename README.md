@@ -45,3 +45,14 @@ Next, use the following command to upsert the assets: _(-v for verbose output)_
 ```bash
 infrasonar -v upsert-assets assets.yaml
 ```
+
+## Token
+
+A token might be included in the yaml file:
+```yaml
+token: xxxxxx
+```
+
+Or, it will be asked in a prompt when starting the script.
+
+> Note that a **container token** with **Agent** flags must be used for this script to work!

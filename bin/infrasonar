@@ -344,7 +344,7 @@ def sanity_check(data: dict, allow_unknown_collectors: bool,
     assets = data.get('assets')
 
     if token is None:
-        data['token'] = getpass.getpass('Enter container token:')
+        data['token'] = getpass.getpass('Enter container token: ')
     elif not isinstance(token, str):
         sys.exit('token must be a string or null')
 
@@ -516,9 +516,11 @@ def upsert_assets(filename: str, api: str, verify_ssl: bool, verbose: bool,
         except Exception as e:
             msg = str(e) or type(e).__name__
             print(msg)
-
-    if verbose:
-        print(f'Finished upserting {len(assets)} asset(s)')
+        else:
+            if verbose:
+                print(f'Finished upserting {len(assets)} asset(s)')
+    elif verbose:
+        print('No assets to upsert')
 
 
 if __name__ == '__main__':
