@@ -12,7 +12,7 @@ from typing import Any
 from aiohttp import ClientSession
 from setproctitle import setproctitle
 
-__version__ = '0.1.0'
+__version__ = '0.1.0'  # Update version in setup as well
 
 
 _labels_example = """
