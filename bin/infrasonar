@@ -344,7 +344,10 @@ def sanity_check(data: dict, allow_unknown_collectors: bool,
     assets = data.get('assets')
 
     if token is None:
-        data['token'] = getpass.getpass('Enter container token: ')
+        try:
+            data['token'] = getpass.getpass('Enter container token: ')
+        except KeyboardInterrupt:
+            sys.exit('Cancelled')
     elif not isinstance(token, str):
         sys.exit('token must be a string or null')
 
@@ -430,7 +433,7 @@ async def upsert_asset(api: str, token: str, asset: dict,
             print(f'Set collector "{key}" for asset "{name}" ({asset_id})')
         await asyncio.sleep(0.5)
         config = collector.get('config')
-        url = _join(self.api_uri, f'asset/{asset_id}/collector/{key}')
+        url = _join(api, f'asset/{asset_id}/collector/{key}')
         if config is None:
             async with ClientSession(headers=_headers(token)) as session:
                 async with session.post(url, ssl=verify_ssl) as r:
@@ -445,12 +448,12 @@ async def upsert_asset(api: str, token: str, asset: dict,
                         msg = await r.text()
                         raise Exception(f'{msg} (error code: {r.status})')
 
-    labes = asset['labels']
+    labels = asset['labels']
     for label_id in labels:
         if verbose:
             print(f'Set label id {label_id} for asset "{name}" ({asset_id})')
         await asyncio.sleep(0.5)
-        url = _join(self.api_uri, f'asset/{asset_id}/label/{label_id}')
+        url = _join(api, f'asset/{asset_id}/label/{label_id}')
         async with ClientSession(headers=_headers(token)) as session:
             async with session.post(url, ssl=verify_ssl) as r:
                 if r.status != 204:
@@ -469,7 +472,7 @@ async def async_upsert_assets(api: str, token: str, assets: list, labels: dict,
             resp = await r.json()
             container_id = resp['containerId']
             if verbose:
-                print(f'Container id: {conainer_id}')
+                print(f'Container id: {container_id}')
                 await asyncio.sleep(1)
 
     for name, label_id in labels.items():
@@ -513,6 +516,8 @@ def upsert_assets(filename: str, api: str, verify_ssl: bool, verbose: bool,
         try:
             asyncio.run(async_upsert_assets(
                 api, token, assets, labels, verify_ssl, verbose))
+        except KeyboardInterrupt:
+            print('Cancelled')
         except Exception as e:
             msg = str(e) or type(e).__name__
             print(msg)
