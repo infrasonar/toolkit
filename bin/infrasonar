@@ -566,7 +566,7 @@ def upsert_assets(filename: str, api: str, verify_ssl: bool, verbose: bool,
 async def async_get_assets(api: str, token: str, container_id: int,
                            verify_ssl: bool):
     url = _join(api, f'container/{container_id}/assets?fields=id,name')
-    async with ClientSession(headers=_headers(token)) as session:s
+    async with ClientSession(headers=_headers(token)) as session:
         async with session.get(url, ssl=verify_ssl) as r:
             if r.status != 200:
                 msg = await r.text()

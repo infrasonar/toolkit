@@ -46,6 +46,8 @@ Next, use the following command to upsert the assets: _(-v for verbose output)_
 infrasonar upsert-assets assets.yaml -v
 ```
 
+The script will create a new asset if an asset with the given name cannot be found, otherwise it will apply the changes to the existing asset. Existing labels and/or collectors will _not_ be removed, but a _kind_ will be overwritten if one is given. The properties _kind_, _labels_ and _collectors_ are all optional.
+
 ### Token
 
 A token might be included in the yaml file:
@@ -55,11 +57,11 @@ token: xxxxxx
 
 Or, it will be asked in a prompt when starting the script.
 
-> Note that a **container token** with **Agent** flags must be used for this script to work!
+> :point_right: Note that a **container token** with **Agent** flags must be used for the _upsert-assets_ action to work!
 
 ## Get assets
 
-Get container assets. _(in the example, 123 is a container Id)_
+Get container assets. _(in the example below, 123 is a container Id)_
 
 ```bash
 infrasonar get-assets 123 -o yaml
