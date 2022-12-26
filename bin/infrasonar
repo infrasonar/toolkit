@@ -382,6 +382,7 @@ def sanity_check(data: dict, allow_unknown_collectors: bool,
 async def upsert_asset(api: str, token: str, asset: dict,
                        verify_ssl: bool, verbose: bool,
                        container_id: int):
+    print('-'*80)
     name = asset['name']
     url = _join(api, f'asset/{name}/id')
     async with ClientSession(headers=_headers(token)) as session:
@@ -523,6 +524,7 @@ def upsert_assets(filename: str, api: str, verify_ssl: bool, verbose: bool,
             print(msg)
         else:
             if verbose:
+                print('-'*80)
                 print(f'Finished upserting {len(assets)} asset(s)')
     elif verbose:
         print('No assets to upsert')
