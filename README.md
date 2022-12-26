@@ -55,4 +55,4 @@ token: xxxxxx
 
 Or, it will be asked in a prompt when starting the script.
 
-> Note that a **container token** with **Agent** flags must be used for this script to work!
+> :point_right: Note that a **container token** with **Agent** flags must be used for this script to work!
