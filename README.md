@@ -43,10 +43,10 @@ assets:
 Next, use the following command to upsert the assets: _(-v for verbose output)_
 
 ```bash
-infrasonar -v upsert-assets assets.yaml
+infrasonar upsert-assets assets.yaml -v
 ```
 
-## Token
+### Token
 
 A token might be included in the yaml file:
 ```yaml
@@ -56,3 +56,11 @@ token: xxxxxx
 Or, it will be asked in a prompt when starting the script.
 
 > Note that a **container token** with **Agent** flags must be used for this script to work!
+
+## Get assets
+
+Get container assets. _(in the example, 123 is a container Id)_
+
+```bash
+infrasonar get-assets 123 -o yaml
+```

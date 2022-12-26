@@ -2,17 +2,18 @@
 import argparse
 import asyncio
 import getpass
+import json
 import os
 import pprint
 import re
 import sys
 import yaml
 from functools import partial
-from typing import Any
+from typing import Any, Optional
 from aiohttp import ClientSession
 from setproctitle import setproctitle
 
-__version__ = '0.1.0'  # Update version in setup as well
+__version__ = '0.1.1'  # Update version in setup as well
 
 
 _labels_example = """
@@ -103,7 +104,7 @@ def _json_headers(token: str):
 
 
 _yaml_keys = set(['token', 'labels', 'configs', 'assets'])
-_asset_keys = set(['name', 'kind', 'labels', 'collectors'])
+_asset_keys = set(['id', 'name', 'kind', 'labels', 'collectors'])
 _collector_keys = set(['key', 'config'])
 
 _spaces = re.compile(r'\s+')
@@ -292,11 +293,16 @@ def check_asset(asset: dict, labels: dict, configs: dict,
     if too_much:
         sys.exit(f'Unexpected key in asset: "{too_much.pop()}"')
 
+    asset_id = asset.get('id')
+    if asset_id is not None and not isinstance(asset_id, int):
+        sys.exit('Asset id must be an integer')
+
     name = asset.get('name')
-    if name is None:
-        sys.exit('Missing required asset property: "name"')
-    if not isinstance(name, str):
+    if name is not None and not isinstance(name, str):
         sys.exit('Asset name must be a string')
+
+    if name is None and id is None:
+        sys.exit('Missing required asset property: "name" or "id"')
 
     kind = asset.get('kind')
     if kind is not None and kind not in _kinds and not allow_unknown_kinds:
@@ -383,36 +389,38 @@ async def upsert_asset(api: str, token: str, asset: dict,
                        verify_ssl: bool, verbose: bool,
                        container_id: int):
     print('-'*80)
+    asset_id = asset.get('id')
     name = asset['name']
-    url = _join(api, f'asset/{name}/id')
-    async with ClientSession(headers=_headers(token)) as session:
-        async with session.get(url, ssl=verify_ssl) as r:
-            if r.status == 404:
-                asset_id = None
-            elif r.status != 200:
-                msg = await r.text()
-                raise Exception(f'{msg} (error code: {r.status})')
-            else:
-                resp = await r.json()
-                asset_id = resp['assetId']
-
     if asset_id is None:
-        if verbose:
-            print(f'Create a new asset for "{name}"...')
-            await asyncio.sleep(2)
-        url = _join(api, f'container/{container_id}/asset')
-        data = {"name": name}
-        async with ClientSession(headers=_json_headers(token)) as session:
-            async with session.post(url, json=data, ssl=verify_ssl) as r:
-                if r.status != 201:
+        url = _join(api, f'asset/{name}/id')
+        async with ClientSession(headers=_headers(token)) as session:
+            async with session.get(url, ssl=verify_ssl) as r:
+                if r.status == 404:
+                    asset_id = None
+                elif r.status != 200:
                     msg = await r.text()
                     raise Exception(f'{msg} (error code: {r.status})')
-                resp = await r.json()
-                asset_id = resp['assetId']
-        if verbose:
-            print(f'New asset id for "{name}": {asset_id}')
-    elif verbose:
-        print(f'Existing asset id for "{name}": {asset_id}')
+                else:
+                    resp = await r.json()
+                    asset_id = resp['assetId']
+
+        if asset_id is None:
+            if verbose:
+                print(f'Create a new asset for "{name}"...')
+                await asyncio.sleep(2)
+            url = _join(api, f'container/{container_id}/asset')
+            data = {"name": name}
+            async with ClientSession(headers=_json_headers(token)) as session:
+                async with session.post(url, json=data, ssl=verify_ssl) as r:
+                    if r.status != 201:
+                        msg = await r.text()
+                        raise Exception(f'{msg} (error code: {r.status})')
+                    resp = await r.json()
+                    asset_id = resp['assetId']
+            if verbose:
+                print(f'New asset id for "{name}": {asset_id}')
+        elif verbose:
+            print(f'Existing asset id for "{name}": {asset_id}')
 
     kind = asset.get('kind')
     if kind is not None:
@@ -462,6 +470,28 @@ async def upsert_asset(api: str, token: str, asset: dict,
                     raise Exception(f'{msg} (error code: {r.status})')
 
 
+async def name_assets(api: str, token: str, asset: dict, verify_ssl: bool,
+                      verbose: bool):
+    asset_id = asset.get('id')
+    if asset_id is None:
+        return
+    url = _join(api, f'asset/{asset_id}?fields=name')
+    async with ClientSession(headers=_headers(token)) as session:
+        async with session.get(url, ssl=verify_ssl) as r:
+            if r.status != 200:
+                msg = await r.text()
+                raise Exception(f'{msg} (error code: {r.status})')
+            resp = await r.json()
+            asset_name = resp['name']
+    name = asset.get('name')
+    if isinstance(name, str) and name != asset_name and verbose:
+        print(
+            'Name mismatch for '
+            f'asset {asset_id}; Expecting "{name}" but got "{asset_name}"')
+        await asyncio.sleep(3)
+    asset['name'] = asset_name
+
+
 async def async_upsert_assets(api: str, token: str, assets: list, labels: dict,
                               verify_ssl: bool, verbose: bool):
     url = _join(api, 'container/id')
@@ -487,6 +517,9 @@ async def async_upsert_assets(api: str, token: str, assets: list, labels: dict,
                 lname = resp['name']
                 if verbose:
                     print(f'Label "{name}" ({label_id}) actual name: {lname}')
+
+    for asset in assets:
+        await name_assets(api, token, asset, verify_ssl, verbose)
 
     if labels and verbose:
         await asyncio.sleep(3)
@@ -530,14 +563,46 @@ def upsert_assets(filename: str, api: str, verify_ssl: bool, verbose: bool,
         print('No assets to upsert')
 
 
+async def async_get_assets(api: str, token: str, container_id: int,
+                           verify_ssl: bool):
+    url = _join(api, f'container/{container_id}/assets?fields=id,name')
+    async with ClientSession(headers=_headers(token)) as session:s
+        async with session.get(url, ssl=verify_ssl) as r:
+            if r.status != 200:
+                msg = await r.text()
+                raise Exception(f'{msg} (error code: {r.status})')
+            resp = await r.json()
+            return resp
+
+
+def get_assets(container_id: int, api: str, verify_ssl: bool, output: str,
+               token: Optional[str]):
+    if token is None:
+        try:
+            token = getpass.getpass('Enter container token: ')
+        except KeyboardInterrupt:
+            sys.exit('Cancelled')
+
+    try:
+        res = asyncio.run(async_get_assets(
+            api, token, container_id, verify_ssl))
+    except KeyboardInterrupt:
+        print('Cancelled')
+    except Exception as e:
+        msg = str(e) or type(e).__name__
+        print(msg)
+    else:
+        data = {'assets': res}
+        if output == 'json':
+            json.dump(data, sys.stdout)
+        elif output == 'yaml':
+            yaml.safe_dump(data, sys.stdout)
+
+
 if __name__ == '__main__':
     setproctitle('infrasonar')
 
     parser = argparse.ArgumentParser(prog='infrasonar')
-    parser.add_argument(
-        '-v', '--verbose',
-        action='store_true',
-        help='Verbose output')
     parser.add_argument(
         '--version',
         action='store_true',
@@ -553,16 +618,33 @@ if __name__ == '__main__':
 
     action = parser.add_subparsers(help='action', dest='action')
 
-    upsert = action.add_parser('upsert-assets', help='Upsert assets')
-    upsert.add_argument('filename')
-    upsert.add_argument(
+    action_upsert_assets = \
+        action.add_parser('upsert-assets', help='Upsert assets')
+    action_upsert_assets.add_argument('filename')
+    action_upsert_assets.add_argument(
         '--allow-unknown-collectors',
         action='store_true',
         help='Allow collectors unknown to this toolkit')
-    upsert.add_argument(
+    action_upsert_assets.add_argument(
         '--allow-unknown-kinds',
         action='store_true',
         help='Allow kinds unknown to this toolkit')
+    action_upsert_assets.add_argument(
+        '-v', '--verbose',
+        action='store_true',
+        help='Verbose output')
+
+    action_get_assets = \
+        action.add_parser('get-assets', help='Get container assets')
+
+    action_get_assets.add_argument('containerId', type=int)
+    action_get_assets.add_argument('-o', '--output',
+                                   choices=['json', 'yaml'],
+                                   default='yaml')
+    action_get_assets.add_argument(
+        '--token',
+        default=None,
+        help='Token for authentication')
 
     args = parser.parse_args()
 
@@ -578,3 +660,10 @@ if __name__ == '__main__':
             args.verbose,
             args.allow_unknown_collectors,
             args.allow_unknown_kinds)
+    elif args.action == 'get-assets':
+        get_assets(
+            args.containerId,
+            args.api,
+            not args.skip_verify_ssl,
+            args.output,
+            args.token)
