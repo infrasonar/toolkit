@@ -447,14 +447,14 @@ def config_eq(orig, dest, control):
     if dest:
         for key, dval in dest.items():
             v = control[key][1]
-            oval = orig.get(key, v)
+            oval = v if orig is None else orig.get(key, v)
             if dval != oval:
                 return False
 
     if orig:
         for key, oval in orig.items():
             v = control[key][1]
-            dval = dest.get(key, v)
+            dval = v if dest is None else dest.get(key, v)
             if dval != oval:
                 return False
 
