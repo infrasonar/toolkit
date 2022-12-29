@@ -16,7 +16,7 @@ from functools import partial
 from setproctitle import setproctitle
 from typing import Any, Optional, Dict, List, Tuple
 
-__version__ = '0.1.1'  # Update version in setup as well
+__version__ = '0.1.2'  # Update version in setup as well
 
 
 _labels_example = """
@@ -803,7 +803,7 @@ async def async_get_labels(api: str, token: str, verify_ssl: bool,
     return labels
 
 
-def mod_assets_res(assets: list, labels: dict):
+def mod_assets_res(assets: list, labels: dict, include_defaults: bool):
     labels = {v: k for k, v in labels.items()}
     ordered = []
     for asset in assets:
@@ -830,7 +830,7 @@ def mod_assets_res(assets: list, labels: dict):
                 c['key'] = collector['key']
                 config = collector['config']
 
-                if config:
+                if not include_defaults and config:
                     control = _collectors.get(c['key'])
                     if control is not None:
                         for k in tuple(config.keys()):
@@ -847,7 +847,8 @@ def mod_assets_res(assets: list, labels: dict):
 
 
 def get_assets(container_id: int, api: str, verify_ssl: bool, output: str,
-               token: Optional[str], fields: Optional[list]):
+               token: Optional[str], fields: Optional[list],
+               include_defaults: bool):
     if fields is None:
         fields = set(_asset_keys)
     else:
@@ -873,7 +874,7 @@ def get_assets(container_id: int, api: str, verify_ssl: bool, output: str,
             if label_ids:
                 labels = asyncio.run(async_get_labels(
                     api, token, verify_ssl, label_ids))
-        mod_assets_res(assets, labels)
+        mod_assets_res(assets, labels, include_defaults)
 
         data = OrderedDict()
         data['container'] = container_id
@@ -944,10 +945,18 @@ if __name__ == '__main__':
     action_get_assets.add_argument('containerId', type=int)
     action_get_assets.add_argument('-f', '--field',
                                    choices=list(_asset_keys),
-                                   action='append')
+                                   action='append',
+                                   help=(
+                                    'Fields to return. If not specified, '
+                                    'all fields will be returned'))
     action_get_assets.add_argument('-o', '--output',
                                    choices=['json', 'yaml'],
                                    default='yaml')
+    action_get_assets.add_argument('-i', '--include-defaults',
+                                   action='store_true',
+                                   help=(
+                                    'Include default collector configuration '
+                                    'values'))
     action_get_assets.add_argument(
         '--token',
         default=None,
@@ -976,6 +985,7 @@ if __name__ == '__main__':
             not args.skip_verify_ssl,
             args.output,
             args.token,
-            args.field)
+            args.field,
+            args.include_defaults)
     else:
         parser.print_help()
