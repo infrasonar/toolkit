@@ -40,13 +40,13 @@ assets:
   - key: wmi
 ```
 
-Next, use the following command to apply the assets: _(-a will only add labels and collectors)_
+Next, use the following command to apply the assets: _(-a will only add labels and collectors, -d perform a dry-run without applying the changes)_
 
 ```bash
-infrasonar upsert-assets assets.yaml -a -d
+infrasonar apply-assets assets.yaml -a -d
 ```
 
-The script will create a new asset if an asset with the given name cannot be found, otherwise it will apply the changes to the existing asset. Existing labels and/or collectors will _not_ be removed, but a _kind_ will be overwritten if one is given. The properties _kind_, _labels_ and _collectors_ are all optional.
+The script will create a new asset if an asset with the given name cannot be found, otherwise it will apply the changes to the existing asset. Existing labels and/or collectors will _not_ be removed, but a _kind_ will be overwritten if one is given. The properties _kind_, _description_, _mode_, _labels_ and _collectors_ are all optional.
 
 ### Token
 
@@ -67,23 +67,11 @@ Get container assets. _(in the example below, 123 is a container Id)_
 infrasonar get-assets 123 -o yaml
 ```
 
-Example output:
 
-```yaml
-container: 123
-labels:
-  windows: 3257
-configs:
-  tcp:
-    checkCertificatePorts: [443, 995, 993, 465, 3389, 989, 990, 636, 5986]
+## Help
 
-assets:
-- name: foo.local
-  kind: Windows
-  labels: ["windows"]
-  collectors:
-  - key: lastseen
-  - key: ping
-  - key: tcp
-    config: tcp
-  - key: wmi
+```
+infrasonar -h
+infrasonar get-assets -h
+infrasonar apply-assets -h
+```
