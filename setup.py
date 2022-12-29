@@ -49,6 +49,7 @@ setup(
     install_requires=[
         'aiohttp',
         'pyyaml',
+        'yamlloader',
         'setproctitle',
     ],
     keywords='infrasonar monitoring toolkit util',
