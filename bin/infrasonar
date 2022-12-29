@@ -158,116 +158,110 @@ def _test_name_servers(o: Any, key: str):
 
 
 def _test_fqdn(o: Any, key: str):
-    if o is not None:
-        if not isinstance(o, str):
-            sys.exit(f'Option "fqdn" ({key}) must be a string or null')
+    if not isinstance(o, str):
+        sys.exit(f'Option "fqdn" ({key}) must be a string or null')
 
 
 def _test_address(o: Any, key: str):
-    if o is not None:
-        if not isinstance(o, str) or _spaces.search(o):
-            sys.exit(
-                f'Option "address" ({key}) must be a string without '
-                'whitespace or null')
+    if not isinstance(o, str) or _spaces.search(o):
+        sys.exit(
+            f'Option "address" ({key}) must be a string without '
+            'whitespace or null')
 
 
 def _test_interval(o: Any, key: str):
-    if o is not None:
-        if not isinstance(o, int) or not (1 <= o <= 9):
-            sys.exit(
-                f'Option "interval" ({key}) must be an interger value '
-                'between 1 and 9')
+    if not isinstance(o, int) or not (1 <= o <= 9):
+        sys.exit(
+            f'Option "interval" ({key}) must be an interger value '
+            'between 1 and 9')
 
 
 def _test_count(o: Any, key: str):
-    if o is not None:
-        if not isinstance(o, int) or not (1 <= o <= 9):
-            sys.exit(
-                f'Option "count" ({key}) must be an interger value '
-                'between 1 and 9')
+    if not isinstance(o, int) or not (1 <= o <= 9):
+        sys.exit(
+            f'Option "count" ({key}) must be an interger value '
+            'between 1 and 9')
 
 
 def _test_timeout(o: Any, key: str):
-    if o is not None:
-        if not isinstance(o, (float, int)) or not (0.0 <= o <= 240.0):
-            sys.exit(
-                f'Option "timeout" ({key}) must be a float value '
-                'between 0.0 and 240.0')
+    if not isinstance(o, (float, int)) or not (0.0 <= o <= 240.0):
+        sys.exit(
+            f'Option "timeout" ({key}) must be a float value '
+            'between 0.0 and 240.0')
 
 
 def _test_ports(o: Any, key: str, prop: str):
-    if o is not None:
-        if not isinstance(o, list) or \
-                not all([
-                    isinstance(obj, int) and (0 < obj <= 65535)
-                    for obj in o]) or \
-                len(set(o)) != len(o):
-            sys.exit(
-                f'Option "{prop}" ({key}) is required and must be '
-                'a list with unique port numbers')
+    if not isinstance(o, list) or \
+            not all([
+                isinstance(obj, int) and (0 < obj <= 65535)
+                for obj in o]) or \
+            len(set(o)) != len(o):
+        sys.exit(
+            f'Option "{prop}" ({key}) is required and must be '
+            'a list with unique port numbers')
 
 
 def _test_port(o: Any, key: str):
-    if o is not None:
-        if not isinstance(o, int) or not (0 < o <= 65535):
-            sys.exit(
-                f'Option "port" ({key}) must be an interger value '
-                'between 1 and 65535')
+    if not isinstance(o, int) or not (0 < o <= 65535):
+        sys.exit(
+            f'Option "port" ({key}) must be an interger value '
+            'between 1 and 65535')
 
 
 def _test_uri(o: Any, key: str):
-    if o is not None:
-        if not isinstance(o, str) or not _uri.match(o):
-            sys.exit(
-                f'Option "uri" ({key}) must be a valid URI')
+    if not isinstance(o, str) or not _uri.match(o):
+        sys.exit(
+            f'Option "uri" ({key}) must be a valid URI')
 
 
 def _test_bool(o: Any, key: str, prop: str):
-    if o is not None and not isinstance(o, bool):
+    if not isinstance(o, bool):
         sys.exit(f'Option "{prop}" ({key}) must be a boolean value')
 
 
 _collectors = {
     'dns': {
-        'nameServers': _test_name_servers,
-        'fqdn': _test_fqdn,
+        'nameServers': (_test_name_servers, []),
+        'fqdn': (_test_fqdn, ''),
     },
     'docker': None,
     'esx': {
-        'address': _test_address,
+        'address': (_test_address, ''),
     },
     'http': {
-        'uri': _test_uri,
-        'timeout': _test_timeout,
-        'verifySSL': partial(_test_bool, prop='verifySSL'),
-        'withPayload': partial(_test_bool, prop='withPayload'),
-        'allowRedirects': partial(_test_bool, prop='allowRedirects')
+        'uri': (_test_uri, ''),
+        'timeout': (_test_timeout, 10.0),
+        'verifySSL': (partial(_test_bool, prop='verifySSL'), False),
+        'withPayload': (partial(_test_bool, prop='withPayload'), False),
+        'allowRedirects': (partial(_test_bool, prop='allowRedirects'), False),
     },
     'lastseen': None,
     'mssql': {
-        'address': _test_address,
-        'port': _test_port,
+        'address': (_test_address, ''),
+        'port': (_test_port, 1433),
     },
     'ping': {
-        'address': _test_address,
-        'interval': _test_interval,
-        'count': _test_count,
-        'timeout': _test_timeout,
+        'address': (_test_address, ''),
+        'interval': (_test_interval, 1),
+        'count': (_test_count, 5),
+        'timeout': (_test_timeout, 10.0),
     },
     'snmp': {
-        'address': _test_address,
+        'address': (_test_address, ''),
     },
     'tcp': {
-        'address': _test_address,
-        'checkCertificatePorts':
+        'address': (_test_address, ''),
+        'checkCertificatePorts': (
             partial(_test_ports, prop='checkCertificatePorts'),
-        'checkPorts': partial(_test_ports, prop='checkPorts')
+            [443, 995, 993, 465, 3389, 989, 990, 636, 5986]
+        ),
+        'checkPorts': (partial(_test_ports, prop='checkPorts'), []),
     },
     'vcenter': {
-        'address': _test_address,
+        'address': (_test_address, ''),
     },
     'wmi': {
-        'address': _test_address,
+        'address': (_test_address, ''),
     }
 }
 
@@ -318,7 +312,8 @@ def check_collector(collector: dict, configs: dict,
             sys.exit(
                 f'Unexpected property in collector {key}: "{too_much.pop()}"')
         for k, tester in validate.items():
-            tester(config.get(k), key)
+            func, dval = tester
+            func(config.get(k, dval), key)
 
 
 def check_asset(asset: dict, labels: dict, configs: dict,
@@ -445,6 +440,27 @@ def make_changes(changes: bool):
     return True
 
 
+def config_eq(orig, dest, control):
+    if orig == dest:
+        return True
+
+    if dest:
+        for key, dval in dest.items():
+            v = control[key][1]
+            oval = orig.get(key, v)
+            if dval != oval:
+                return False
+
+    if orig:
+        for key, oval in orig.items():
+            v = control[key][1]
+            dval = dest.get(key, v)
+            if dval != oval:
+                return False
+
+    return True
+
+
 async def apply_asset(aa: ApplyAssets, dest: dict):
     headers = _headers(aa.token)
     jheaders = _json_headers(aa.token)
@@ -527,7 +543,7 @@ async def apply_asset(aa: ApplyAssets, dest: dict):
             key = collector['key']
             config = collector.get('config')
             oc = collector_by_key(orig, key)
-            if oc and oc.get('config') == config:
+            if oc and config_eq(oc.get('config'), config, _collectors[key]):
                 continue
 
             changes = make_changes(changes)
@@ -812,8 +828,16 @@ def mod_assets_res(assets: list, labels: dict):
             for collector in collectors:
                 c = OrderedDict()
                 c['key'] = collector['key']
-                if collector['config']:
-                    c['config'] = collector['config']
+                config = collector['config']
+
+                if config:
+                    control = _collectors.get(c['key'])
+                    if control is not None:
+                        for k in tuple(config.keys()):
+                            if config[k] == control[k][1]:
+                                del config[k]
+                if config:
+                    c['config'] = config
                 cc.append(c)
             a['collectors'] = cc
         ordered.append(a)
