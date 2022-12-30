@@ -12,11 +12,10 @@ import yamlloader
 from aiohttp import ClientSession
 from collections import OrderedDict
 from dataclasses import dataclass
-from functools import partial
 from setproctitle import setproctitle
 from typing import Any, Optional, Dict, List, Tuple
 
-__version__ = '0.1.2'  # Update version in setup as well
+__version__ = '0.1.3'  # Update version in setup as well
 
 
 _labels_example = """
@@ -90,6 +89,8 @@ _kinds = (
     'Windows',
 )
 
+_modes = ('normal', 'maintenance', 'disabled')
+
 
 @dataclass
 class ApplyAssets:
@@ -145,7 +146,7 @@ _uri = re.compile(r'https?:\/\/.+')
 _extract_name = re.compile(r'\w+')
 
 
-def _test_name_servers(o: Any, key: str):
+def _test_name_servers(o: Any, key: str, prop: str):
     if not isinstance(o, list) or \
             not len(o) or \
             not all([
@@ -157,33 +158,33 @@ def _test_name_servers(o: Any, key: str):
             'with unique and at least one nameserver')
 
 
-def _test_fqdn(o: Any, key: str):
+def _test_fqdn(o: Any, key: str, prop: str):
     if not isinstance(o, str):
         sys.exit(f'Option "fqdn" ({key}) must be a string or null')
 
 
-def _test_address(o: Any, key: str):
+def _test_address(o: Any, key: str, prop: str):
     if not isinstance(o, str) or _spaces.search(o):
         sys.exit(
             f'Option "address" ({key}) must be a string without '
             'whitespace or null')
 
 
-def _test_interval(o: Any, key: str):
+def _test_interval(o: Any, key: str, prop: str):
     if not isinstance(o, int) or not (1 <= o <= 9):
         sys.exit(
             f'Option "interval" ({key}) must be an interger value '
             'between 1 and 9')
 
 
-def _test_count(o: Any, key: str):
+def _test_count(o: Any, key: str, prop: str):
     if not isinstance(o, int) or not (1 <= o <= 9):
         sys.exit(
             f'Option "count" ({key}) must be an interger value '
             'between 1 and 9')
 
 
-def _test_timeout(o: Any, key: str):
+def _test_timeout(o: Any, key: str, prop: str):
     if not isinstance(o, (float, int)) or not (0.0 <= o <= 240.0):
         sys.exit(
             f'Option "timeout" ({key}) must be a float value '
@@ -201,14 +202,14 @@ def _test_ports(o: Any, key: str, prop: str):
             'a list with unique port numbers')
 
 
-def _test_port(o: Any, key: str):
+def _test_port(o: Any, key: str, prop: str):
     if not isinstance(o, int) or not (0 < o <= 65535):
         sys.exit(
             f'Option "port" ({key}) must be an interger value '
             'between 1 and 65535')
 
 
-def _test_uri(o: Any, key: str):
+def _test_uri(o: Any, key: str, prop: str):
     if not isinstance(o, str) or not _uri.match(o):
         sys.exit(
             f'Option "uri" ({key}) must be a valid URI')
@@ -231,9 +232,9 @@ _collectors = {
     'http': {
         'uri': (_test_uri, ''),
         'timeout': (_test_timeout, 10.0),
-        'verifySSL': (partial(_test_bool, prop='verifySSL'), False),
-        'withPayload': (partial(_test_bool, prop='withPayload'), False),
-        'allowRedirects': (partial(_test_bool, prop='allowRedirects'), False),
+        'verifySSL': (_test_bool, False),
+        'withPayload': (_test_bool, False),
+        'allowRedirects': (_test_bool, False),
     },
     'lastseen': None,
     'mssql': {
@@ -252,10 +253,10 @@ _collectors = {
     'tcp': {
         'address': (_test_address, ''),
         'checkCertificatePorts': (
-            partial(_test_ports, prop='checkCertificatePorts'),
+            _test_ports,
             [443, 995, 993, 465, 3389, 989, 990, 636, 5986]
         ),
-        'checkPorts': (partial(_test_ports, prop='checkPorts'), []),
+        'checkPorts': (_test_ports, []),
     },
     'vcenter': {
         'address': (_test_address, ''),
@@ -313,7 +314,7 @@ def check_collector(collector: dict, configs: dict,
                 f'Unexpected property in collector {key}: "{too_much.pop()}"')
         for k, tester in validate.items():
             func, dval = tester
-            func(config.get(k, dval), key)
+            func(config.get(k, dval), key, k)
 
 
 def check_asset(asset: dict, labels: dict, configs: dict,
@@ -338,7 +339,7 @@ def check_asset(asset: dict, labels: dict, configs: dict,
         sys.exit('Asset description must be a string')
 
     mode = asset.get('mode')
-    if mode is not None and mode not in ('normal', 'maintenance', 'disabled'):
+    if mode is not None and mode not in _modes:
         sys.exit(
             'Asset mode must be one of "normal", "maintenance" or "disabled"')
 
@@ -416,7 +417,12 @@ def sanity_check(data: dict, allow_unknown_collectors: bool,
 
     if token is None:
         try:
-            data['token'] = getpass.getpass('Enter container token: ')
+            ttype = 'container'
+            if container_id:
+                if all(('id' in a for a in assets)):
+                    ttype = 'user or container'
+
+            data['token'] = getpass.getpass(f'Enter {ttype} token: ')
         except KeyboardInterrupt:
             sys.exit('Cancelled')
     elif not isinstance(token, str):
@@ -749,8 +755,12 @@ def apply_assets(filename: str, api: str, verify_ssl: bool, add_only: bool,
         print('No assets to apply')
 
 
-async def async_get_assets(api: str, token: str, container_id: int,
-                           verify_ssl: bool, fields: Optional[list]):
+async def aget_assets(api: str, token: str, container_id: int,
+                      verify_ssl: bool, fields: Optional[set],
+                      kind: Optional[str], not_kind: Optional[str],
+                      mode: Optional[str], not_mode: Optional[str],
+                      collector: Optional[str], not_collector: Optional[str],
+                      label: Optional[int], not_label: Optional[int]):
 
     if 'collectors' in fields:
         fields.remove('collectors')
@@ -761,7 +771,25 @@ async def async_get_assets(api: str, token: str, container_id: int,
     args = ','.join(fields)
     args = f'?fields={args}{collectors}'
 
+    if kind:
+        args += f'&kind={kind}'
+    if not_kind:
+        args += f'&not-kind={not_kind}'
+    if mode:
+        args += f'&mode={mode}'
+    if not_mode:
+        args += f'&not-mode={not_mode}'
+    if collector:
+        args += f'&collector={collector}'
+    if not_collector:
+        args += f'&not-collector={not_collector}'
+    if label:
+        args += f'&label={label}'
+    if not_label:
+        args += f'&not-label={not_label}'
+
     url = _join(api, f'container/{container_id}/assets{args}')
+    print(url)
     async with ClientSession(headers=_headers(token)) as session:
         async with session.get(url, ssl=verify_ssl) as r:
             if r.status != 200:
@@ -769,6 +797,30 @@ async def async_get_assets(api: str, token: str, container_id: int,
                 raise Exception(f'{msg} (error code: {r.status})')
             resp = await r.json()
             return resp
+
+
+async def aget_asset(api: str, token: str, asset_id: int,
+                     verify_ssl: bool, fields: Optional[set]):
+
+    if 'collectors' in fields:
+        fields.remove('collectors')
+        collectors = '&collectors=key,config'
+    else:
+        collectors = ''
+
+    fields.add('container')
+
+    args = ','.join(fields)
+    args = f'?fields={args}{collectors}'
+
+    url = _join(api, f'asset/{asset_id}{args}')
+    async with ClientSession(headers=_headers(token)) as session:
+        async with session.get(url, ssl=verify_ssl) as r:
+            if r.status != 200:
+                msg = await r.text()
+                raise Exception(f'{msg} (error code: {r.status})')
+            resp = await r.json()
+            return [resp]
 
 
 def get_label_ids(res: list) -> tuple:
@@ -848,7 +900,11 @@ def mod_assets_res(assets: list, labels: dict, include_defaults: bool):
 
 def get_assets(container_id: int, api: str, verify_ssl: bool, output: str,
                token: Optional[str], fields: Optional[list],
-               include_defaults: bool):
+               include_defaults: bool,
+               kind: Optional[str], not_kind: Optional[str],
+               mode: Optional[str], not_mode: Optional[str],
+               collector: Optional[str], not_collector: Optional[str],
+               label: Optional[int], not_label: Optional[int]):
     if fields is None:
         fields = set(_asset_keys)
     else:
@@ -859,15 +915,68 @@ def get_assets(container_id: int, api: str, verify_ssl: bool, output: str,
 
     if token is None:
         try:
-            token = getpass.getpass('Enter container token: ')
+            token = getpass.getpass('Enter user or container token: ')
         except KeyboardInterrupt:
             sys.exit('Cancelled')
 
     with_labels = 'labels' in fields
 
     try:
-        assets = asyncio.run(async_get_assets(
-            api, token, container_id, verify_ssl, fields))
+        assets = asyncio.run(aget_assets(
+            api, token, container_id, verify_ssl, fields,
+            kind, not_kind, mode, not_mode, collector, not_collector,
+            label, not_label))
+        labels = {}
+        if with_labels:
+            label_ids = get_label_ids(assets)
+            if label_ids:
+                labels = asyncio.run(async_get_labels(
+                    api, token, verify_ssl, label_ids))
+        mod_assets_res(assets, labels, include_defaults)
+
+        data = OrderedDict()
+        data['container'] = container_id
+        if labels:
+            data['labels'] = labels
+
+        data['assets'] = assets
+
+    except KeyboardInterrupt:
+        print('Cancelled')
+    except Exception as e:
+        msg = str(e) or type(e).__name__
+        print(msg)
+    else:
+        if output == 'json':
+            json.dump(data, sys.stdout)
+        elif output == 'yaml':
+            yaml.dump(data, sys.stdout,
+                      Dumper=yamlloader.ordereddict.CDumper)
+
+
+def get_asset(asset_id: int, api: str, verify_ssl: bool, output: str,
+              token: Optional[str], fields: Optional[list],
+              include_defaults: bool):
+    if fields is None:
+        fields = set(_asset_keys)
+    else:
+        fields = set(fields)
+
+    if 'id' not in fields and 'name' not in fields:
+        sys.exit('At least field "name" or "id" is required')
+
+    if token is None:
+        try:
+            token = getpass.getpass('Enter user or container token: ')
+        except KeyboardInterrupt:
+            sys.exit('Cancelled')
+
+    with_labels = 'labels' in fields
+
+    try:
+        assets = asyncio.run(aget_asset(
+            api, token, asset_id, verify_ssl, fields))
+        container_id = assets[0]['container']
         labels = {}
         if with_labels:
             label_ids = get_label_ids(assets)
@@ -949,6 +1058,40 @@ if __name__ == '__main__':
                                    help=(
                                     'Fields to return. If not specified, '
                                     'all fields will be returned'))
+    action_get_assets.add_argument('-k', '--kind',
+                                   choices=list(_kinds),
+                                   help=(
+                                    'Only assets with the given kind'))
+    action_get_assets.add_argument('-K', '--not-kind',
+                                   choices=list(_kinds),
+                                   help=(
+                                    'Only assets with another kind than the '
+                                    'given kind'))
+    action_get_assets.add_argument('-m', '--mode',
+                                   choices=_modes,
+                                   help=(
+                                    'Only assets with the given mode'))
+    action_get_assets.add_argument('-M', '--not-mode',
+                                   choices=_modes,
+                                   help=(
+                                    'Only assets with another mode than the '
+                                    'given mode'))
+    action_get_assets.add_argument('-c', '--collector',
+                                   type=str,
+                                   help=(
+                                    'Only assets with the given collector'))
+    action_get_assets.add_argument('-C', '--not-collector',
+                                   type=str,
+                                   help=(
+                                    'Only assets without the given collector'))
+    action_get_assets.add_argument('-l', '--label',
+                                   type=str,
+                                   help=(
+                                    'Only assets with the given label Id'))
+    action_get_assets.add_argument('-L', '--not-label',
+                                   type=str,
+                                   help=(
+                                    'Only assets without the given label Id'))
     action_get_assets.add_argument('-o', '--output',
                                    choices=['json', 'yaml'],
                                    default='yaml')
@@ -957,10 +1100,31 @@ if __name__ == '__main__':
                                    help=(
                                     'Include default collector configuration '
                                     'values'))
-    action_get_assets.add_argument(
-        '--token',
-        default=None,
-        help='Token for authentication')
+    action_get_assets.add_argument('--token',
+                                   default=None,
+                                   help='Token for authentication')
+
+    action_get_asset = \
+        action.add_parser('get-asset', help='Get a single asset')
+
+    action_get_asset.add_argument('assetId', type=int)
+    action_get_asset.add_argument('-f', '--field',
+                                  choices=list(_asset_keys),
+                                  action='append',
+                                  help=(
+                                    'Fields to return. If not specified, '
+                                    'all fields will be returned'))
+    action_get_asset.add_argument('-o', '--output',
+                                  choices=['json', 'yaml'],
+                                  default='yaml')
+    action_get_asset.add_argument('-i', '--include-defaults',
+                                  action='store_true',
+                                  help=(
+                                    'Include default collector configuration '
+                                    'values'))
+    action_get_asset.add_argument('--token',
+                                  default=None,
+                                  help='Token for authentication')
 
     args = parser.parse_args()
 
@@ -981,6 +1145,23 @@ if __name__ == '__main__':
     elif args.action == 'get-assets':
         get_assets(
             args.containerId,
+            args.api,
+            not args.skip_verify_ssl,
+            args.output,
+            args.token,
+            args.field,
+            args.include_defaults,
+            args.kind,
+            args.not_kind,
+            args.mode,
+            args.not_mode,
+            args.collector,
+            args.not_collector,
+            args.label,
+            args.not_label)
+    elif args.action == 'get-asset':
+        get_asset(
+            args.assetId,
             args.api,
             not args.skip_verify_ssl,
             args.output,
