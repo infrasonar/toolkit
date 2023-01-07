@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from setproctitle import setproctitle
 from typing import Any, Optional, Dict, List, Tuple
 
-__version__ = '0.1.3'  # Update version in setup as well
+__version__ = '0.1.4'  # Update version in setup as well
 
 
 _labels_example = """
@@ -241,6 +241,9 @@ _collectors = {
         'address': (_test_address, ''),
         'port': (_test_port, 1433),
     },
+    'netapp': {
+        'address': (_test_address, ''),
+    },
     'ping': {
         'address': (_test_address, ''),
         'interval': (_test_interval, 1),
@@ -450,6 +453,9 @@ def config_eq(orig, dest, control):
     if orig == dest:
         return True
 
+    if control is None:
+        return False
+
     if dest:
         for key, dval in dest.items():
             v = control[key][1]
@@ -549,7 +555,8 @@ async def apply_asset(aa: ApplyAssets, dest: dict):
             key = collector['key']
             config = collector.get('config')
             oc = collector_by_key(orig, key)
-            if oc and config_eq(oc.get('config'), config, _collectors[key]):
+            control = _collectors.get(key)
+            if oc and config_eq(oc.get('config'), config, control):
                 continue
 
             changes = make_changes(changes)
