@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from setproctitle import setproctitle
 from typing import Any, Optional, Dict, List, Tuple
 
-__version__ = '0.1.4'  # Update version in setup as well
+__version__ = '0.1.5'  # Update version in setup as well
 
 
 _labels_example = """
@@ -146,6 +146,13 @@ _uri = re.compile(r'https?:\/\/.+')
 _extract_name = re.compile(r'\w+')
 
 
+def _test_use(o: Any, key: str, prop: str):
+    if not isinstance(o, str) or _spaces.search(o):
+        sys.exit(
+            f'Option "_use" ({key}) must be a string without '
+            'whitespace or null')
+
+
 def _test_name_servers(o: Any, key: str, prop: str):
     if not isinstance(o, list) or \
             not len(o) or \
@@ -228,6 +235,7 @@ _collectors = {
     'docker': None,
     'esx': {
         'address': (_test_address, ''),
+        '_use': (_test_use, ''),
     },
     'http': {
         'uri': (_test_uri, ''),
@@ -240,9 +248,11 @@ _collectors = {
     'mssql': {
         'address': (_test_address, ''),
         'port': (_test_port, 1433),
+        '_use': (_test_use, ''),
     },
     'netapp': {
         'address': (_test_address, ''),
+        '_use': (_test_use, ''),
     },
     'ping': {
         'address': (_test_address, ''),
@@ -252,6 +262,7 @@ _collectors = {
     },
     'snmp': {
         'address': (_test_address, ''),
+        '_use': (_test_use, ''),
     },
     'tcp': {
         'address': (_test_address, ''),
@@ -263,9 +274,11 @@ _collectors = {
     },
     'vcenter': {
         'address': (_test_address, ''),
+        '_use': (_test_use, ''),
     },
     'wmi': {
         'address': (_test_address, ''),
+        '_use': (_test_use, ''),
     }
 }
 
