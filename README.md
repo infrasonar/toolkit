@@ -42,7 +42,7 @@ assets:
   - key: wmi
 ```
 
-Next, use the following command to apply the assets: _(-a will only add labels and collectors, -d perform a dry-run without applying the changes)_
+Next, use the following command to apply the assets: _(-a will only add labels and collectors, -d perform a dry-run without actually applying the changes)_
 
 ```bash
 infrasonar apply-assets assets.yaml -a -d
