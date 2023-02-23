@@ -227,6 +227,10 @@ def _test_bool(o: Any, key: str, prop: str):
     if not isinstance(o, bool):
         sys.exit(f'Option "{prop}" ({key}) must be a boolean value')
 
+def _test_string(o: Any, key: str, prop: str):
+    if not isinstance(o, str):
+        sys.exit(f'Option "{prop}" ({key}) must be a string value')
+
 
 _collectors = {
     'dns': {
@@ -234,7 +238,19 @@ _collectors = {
         'fqdn': (_test_fqdn, ''),
     },
     'docker': None,
+    'eaton': {
+        'address': (_test_address, ''),
+        '_use': (_test_use, ''),
+    },
     'esx': {
+        'address': (_test_address, ''),
+        '_use': (_test_use, ''),
+    },
+    'hpilo': {
+        'address': (_test_address, ''),
+        '_use': (_test_use, ''),
+    },
+    'hpprocurve': {
         'address': (_test_address, ''),
         '_use': (_test_use, ''),
     },
@@ -261,7 +277,18 @@ _collectors = {
         'count': (_test_count, 5),
         'timeout': (_test_timeout, 10.0),
     },
+    'platform': None,
+    'santricity': {
+        'address': (_test_address, ''),
+        'port': (_test_port, 8443),
+        'storageSystemId': (_test_string, '1'),
+        '_use': (_test_use, ''),
+    },
     'snmp': {
+        'address': (_test_address, ''),
+        '_use': (_test_use, ''),
+    },
+    'synology': {
         'address': (_test_address, ''),
         '_use': (_test_use, ''),
     },
@@ -272,6 +299,10 @@ _collectors = {
             [443, 995, 993, 465, 3389, 989, 990, 636, 5986]
         ),
         'checkPorts': (_test_ports, []),
+    },
+    'unifi': {
+        'address': (_test_address, ''),
+        '_use': (_test_use, ''),
     },
     'vcenter': {
         'address': (_test_address, ''),
