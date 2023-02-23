@@ -227,6 +227,7 @@ def _test_bool(o: Any, key: str, prop: str):
     if not isinstance(o, bool):
         sys.exit(f'Option "{prop}" ({key}) must be a boolean value')
 
+
 def _test_string(o: Any, key: str, prop: str):
     if not isinstance(o, str):
         sys.exit(f'Option "{prop}" ({key}) must be a string value')

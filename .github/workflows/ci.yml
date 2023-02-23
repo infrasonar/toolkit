@@ -26,4 +26,4 @@ jobs:
       #     pytest
       - name: Lint with PyCodeStyle
         run: |
-          find . -name \*.py -exec pycodestyle {} +
+          find . -name infrasonar -exec pycodestyle {} +
