@@ -20,7 +20,7 @@ python setup.py install
 
 ## Apply assets
 
-Create a _yaml_ file, for example: `assets.yaml`
+Create a _yaml_ file, for example: `assets.yaml` _(you may also use [get-assets](#get-assets) to export the current assets and make modifications)_
 
 ```yaml
 labels:
