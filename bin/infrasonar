@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from setproctitle import setproctitle
 from typing import Any, Optional, Dict, List, Tuple
 
-__version__ = '0.1.6'  # Update version in setup as well
+__version__ = '0.1.7'  # Update version in setup as well
 
 
 _labels_example = """
@@ -842,7 +842,6 @@ async def aget_assets(api: str, token: str, container_id: int,
         args += f'&not-label={not_label}'
 
     url = _join(api, f'container/{container_id}/assets{args}')
-    print(url)
     async with ClientSession(headers=_headers(token)) as session:
         async with session.get(url, ssl=verify_ssl) as r:
             if r.status != 200:
