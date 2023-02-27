@@ -20,7 +20,7 @@ python setup.py install
 
 ## Apply assets
 
-Create a _yaml_ file, for example: `assets.yaml`
+Create a _yaml_ file, for example: `assets.yaml` _(you may also use [get-assets](#get-assets) to export the current assets and make modifications)_
 
 ```yaml
 labels:
@@ -42,7 +42,7 @@ assets:
   - key: wmi
 ```
 
-Next, use the following command to apply the assets: _(-a will only add labels and collectors, -d perform a dry-run without applying the changes)_
+Next, use the following command to apply the assets: _(**-a** will **only add** labels and collectors, **-d** performs a **dry-run** without actually applying the changes)_
 
 ```bash
 infrasonar apply-assets assets.yaml -a -d
