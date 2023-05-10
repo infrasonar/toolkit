@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from setproctitle import setproctitle
 from typing import Any, Optional, Dict, List, Tuple
 
-__version__ = '0.1.7'  # Update version in setup as well
+__version__ = '0.1.8'  # Update version in setup as well
 
 
 _labels_example = """
@@ -122,6 +122,11 @@ def _json_headers(token: str):
         'Authorization': f'Bearer {token}',
         'Content-Type': 'application/json'
     }
+
+
+def _assetstr(name: str, asset_id: Optional[int]):
+    return \
+        f'asset "{name}" (assetId: {"new" if asset_id is None else asset_id})'
 
 
 _yaml_keys = {
@@ -583,7 +588,7 @@ async def apply_asset(aa: ApplyAssets, dest: dict):
             if not silent:
                 print(
                     f'Change {prop} to "{val}" '
-                    f'for asset "{name}" ({asset_id})')
+                    f'for {_assetstr(name, asset_id)}')
 
             if not dry_run:
                 await asyncio.sleep(0.5)
@@ -608,7 +613,7 @@ async def apply_asset(aa: ApplyAssets, dest: dict):
             changes = make_changes(changes)
             if not silent:
                 prefix = 'Update collector' if oc else 'Add collector'
-                print(f'{prefix} "{key}" on asset "{name}" ({asset_id})')
+                print(f'{prefix} "{key}" on {_assetstr(name, asset_id)}')
 
             if not dry_run:
                 await asyncio.sleep(0.5)
@@ -636,7 +641,7 @@ async def apply_asset(aa: ApplyAssets, dest: dict):
                 changes = make_changes(changes)
                 if not silent:
                     prefix = 'Remove collector'
-                    print(f'{prefix} "{key}" from asset "{name}" ({asset_id})')
+                    print(f'{prefix} "{key}" from {_assetstr(name, asset_id)}')
                 if not dry_run:
                     await asyncio.sleep(0.5)
                     url = _join(api, f'asset/{asset_id}/collector/{key}')
@@ -655,7 +660,7 @@ async def apply_asset(aa: ApplyAssets, dest: dict):
 
             changes = make_changes(changes)
             if not silent:
-                print(f'Add label {lid} on asset "{name}" ({asset_id})')
+                print(f'Add label {lid} on {_assetstr(name, asset_id)}')
 
             if not dry_run:
                 await asyncio.sleep(0.5)
@@ -671,7 +676,7 @@ async def apply_asset(aa: ApplyAssets, dest: dict):
             for lid in rlabels:
                 changes = make_changes(changes)
                 if not silent:
-                    print(f'Remove label {lid} on asset "{name}" ({asset_id})')
+                    print(f'Remove label {lid} on {_assetstr(name, asset_id)}')
 
                 if not dry_run:
                     await asyncio.sleep(0.5)
