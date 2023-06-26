@@ -23,6 +23,8 @@ python setup.py install
 Create a _yaml_ file, for example: `assets.yaml` _(you may also use [get-assets](#get-assets) to export the current assets and make modifications)_
 
 ```yaml
+container: 12345
+
 labels:
   windows: 3257
 
