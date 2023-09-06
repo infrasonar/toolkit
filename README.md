@@ -63,6 +63,15 @@ Or, it will be asked in a prompt when starting the script.
 
 > :point_right: Note that a **token** with **Agent** flags must be used for the _apply-assets_ action to work. A **container token** is required when no _container Id_ is given or when one or more assets without an _asset Id_ are used.
 
+
+## Get asset
+
+Get a single asset. _(in the example below, 123 is a asset Id)_
+
+```bash
+infrasonar get-asset 123 -o yaml
+```
+
 ## Get assets
 
 Get container assets. _(in the example below, 123 is a container Id)_
@@ -72,10 +81,25 @@ infrasonar get-assets 123 -o yaml
 ```
 
 
+## VMware guests
+
+Generate YAML (or JSON) with VMware Guests which are found on ESX or vCenter but wherefore no asset with the `vmwareguest` collector is found. This YAML can then be used to install the VMware Guest collector with a single command.
+
+Example:  _(in the example below, 123 is a container Id)_
+
+```bash
+infrasonar vmware-guests 123 > missing.yaml
+infrasonar apply-assets missing.yaml -a -d
+```
+
+> :point_right: Do not forget to use **-a** to prevent removing other collectors and use **-d** to perform a dry-run for verifying the changes.
+
 ## Help
 
 ```
 infrasonar -h
+infrasonar get-asset -h
 infrasonar get-assets -h
 infrasonar apply-assets -h
+infrasonar vmware-guests -h
 ```
