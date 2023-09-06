@@ -90,7 +90,7 @@ infrasonar vmware-guests 123 > missing.yaml
 infrasonar apply-assets missing.yaml -a -d
 ```
 
-> Do not forget to use **-a** to prevent removing other collectors and use **-d** to perform a dry-run for verifying the changes.
+> :point_right: Do not forget to use **-a** to prevent removing other collectors and use **-d** to perform a dry-run for verifying the changes.
 
 ## Help
 
