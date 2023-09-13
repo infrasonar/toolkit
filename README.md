@@ -89,6 +89,11 @@ Example:  _(in the example below, 123 is a container Id)_
 
 ```bash
 infrasonar vmware-guests 123 > missing.yaml
+```
+
+Review the missing.yaml file _(open in editor or apply a dry-run)_
+
+```
 infrasonar apply-assets missing.yaml -a -d
 ```
 
@@ -102,6 +107,11 @@ Example:  _(in the example below, 123 is a container Id)_
 
 ```bash
 infrasonar hyperv-guests 123 > missing.yaml
+```
+
+Review the missing.yaml file _(open in editor or apply a dry-run)_
+
+```
 infrasonar apply-assets missing.yaml -a -d
 ```
 
