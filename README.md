@@ -94,6 +94,19 @@ infrasonar apply-assets missing.yaml -a -d
 
 > :point_right: Do not forget to use **-a** to prevent removing other collectors and use **-d** to perform a dry-run for verifying the changes.
 
+## Hyper-V guests
+
+Generate YAML (or JSON) with Hyper-V Guests which are found on a Hyper-V asset(s) but wherefore no asset with the `hypervguest` collector is found. This YAML can then be used to install the Hyper-V Guest collector with a single command.
+
+Example:  _(in the example below, 123 is a container Id)_
+
+```bash
+infrasonar hyperv-guests 123 > missing.yaml
+infrasonar apply-assets missing.yaml -a -d
+```
+
+> :point_right: Do not forget to use **-a** to prevent removing other collectors and use **-d** to perform a dry-run for verifying the changes.
+
 ## Help
 
 ```

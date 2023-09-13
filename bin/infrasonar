@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from setproctitle import setproctitle
 from typing import Any, Optional, Dict, List, Tuple
 
-__version__ = '0.1.11'  # Update version in setup as well
+__version__ = '0.1.12'  # Update version in setup as well
 
 
 _labels_example = """
@@ -1008,8 +1008,8 @@ def get_asset(asset_id: int, api: str, verify_ssl: bool, output: str,
 
 
 async def async_get_check_data(api: str, verify_ssl: bool, asset_id: int,
-                               token: str, collector: str):
-    url = _join(api, f'asset/{asset_id}/collector/{collector}/check/hostVMs')
+                               token: str, collector: str, check: str):
+    url = _join(api, f'asset/{asset_id}/collector/{collector}/check/{check}')
     async with ClientSession(headers=_headers(token)) as session:
         async with session.get(url, ssl=verify_ssl) as r:
             if r.status != 200:
@@ -1051,7 +1051,7 @@ def vmware_guests(container_id: int, api: str, verify_ssl: bool, output: str,
         sys.exit(msg)
 
     if not assets:
-        sys.exit('No assets with the {collector} collector found')
+        sys.exit(f'No assets with the {collector} collector found')
 
     asyncio.run(asyncio.sleep(0.5))
 
@@ -1065,10 +1065,10 @@ def vmware_guests(container_id: int, api: str, verify_ssl: bool, output: str,
         ))['config'].get('address', '') or asset['name']
 
         data = asyncio.run(async_get_check_data(api, verify_ssl, asset['id'],
-                                                token, collector))
+                                                token, collector, 'hostVMs'))
         for guest in data['data']['guests']:
             guest['_parent'] = address
-            guest_map[guest['name']] = guest  # name=instanceUuid
+            guest_map[guest['name'].lower()] = guest  # name=instanceUuid
 
         asyncio.run(asyncio.sleep(0.5))
 
@@ -1122,11 +1122,11 @@ def vmware_guests(container_id: int, api: str, verify_ssl: bool, output: str,
     for asset in installed:
         instance_uuid = next((
             x for x in asset['collectors']
-            if x['key'] == 'vmwareguest'))['config']['instance_uuid']
+            if x['key'] == 'vmwareguest'))['config']['instance_uuid'].lower()
         guest_map.pop(instance_uuid, None)
 
     if not guest_map:
-        print('No missing guests are found '
+        print('No missing VMware guests are found '
               f'(installed guests: {total})')
         sys.exit(0)
 
@@ -1143,7 +1143,153 @@ def vmware_guests(container_id: int, api: str, verify_ssl: bool, output: str,
             'key': 'vmwareguest',
             'config': {
                 'hypervisor': guest['_parent'],
-                'instance_uuid': guest['name'],
+                'instance_uuid': guest['name'].lower(),
+            },
+        }]
+        assets.append(asset)
+
+    data = OrderedDict()
+    data['container'] = container_id
+    data['assets'] = assets
+
+    if output == 'json':
+        json.dump(data, sys.stdout)
+    elif output == 'yaml':
+        yaml.dump(data, sys.stdout,
+                  Dumper=yamlloader.ordereddict.CDumper)
+
+        print("""
+# !! IMPORTANT !!
+#   * Make sure to use -a when applying the YAML to prevent
+#     removing existing collectors.
+#   * Be sure to simulate and verify the changes
+#     using a dry-run with the -d argument
+""")
+
+
+def hyperv_guests(container_id: int, api: str, verify_ssl: bool, output: str,
+                  token: Optional[str], include: Optional[List[int]]):
+    if token is None:
+        try:
+            token = getpass.getpass('Enter user or container token: ')
+        except KeyboardInterrupt:
+            sys.exit('Cancelled')
+
+    try:
+        assets = asyncio.run(aget_assets(
+            api=api,
+            token=token,
+            container_id=container_id,
+            verify_ssl=verify_ssl,
+            fields=set(['id', 'name', 'collectors']),
+            kind=None,
+            not_kind=None,
+            mode='normal',
+            not_mode=None,
+            collector='hyperv',
+            not_collector=None,
+            label=None,
+            not_label=None))
+    except KeyboardInterrupt:
+        sys.exit('Cancelled')
+    except Exception as e:
+        msg = str(e) or type(e).__name__
+        sys.exit(msg)
+
+    if not assets:
+        sys.exit('No assets with the hyperv collector found')
+
+    asyncio.run(asyncio.sleep(0.5))
+
+    guest_map = {}
+    for asset in assets:
+        if include and asset['id'] not in include:
+            continue
+        address = next((
+            x for x in asset['collectors']
+            if x['key'] == 'hyperv'
+        ))['config'].get('address', '') or asset['name']
+
+        data = asyncio.run(async_get_check_data(api, verify_ssl, asset['id'],
+                                                token, 'hyperv', 'hyperv'))
+        for guest in data['data']['guests']:
+            guest['_parent'] = address
+            guest_map[guest['name'].upper()] = guest  # name=guid
+
+        asyncio.run(asyncio.sleep(0.5))
+
+    try:
+        installed = asyncio.run(aget_assets(
+            api=api,
+            token=token,
+            container_id=container_id,
+            verify_ssl=verify_ssl,
+            fields=set(['id', 'collectors']),
+            kind=None,
+            not_kind=None,
+            mode=None,
+            not_mode=None,
+            collector='hypervguest',
+            not_collector=None,
+            label=None,
+            not_label=None))
+    except KeyboardInterrupt:
+        sys.exit('Cancelled')
+    except Exception as e:
+        msg = str(e) or type(e).__name__
+        sys.exit(msg)
+
+    asyncio.run(asyncio.sleep(0.5))
+
+    try:
+        not_installed = asyncio.run(aget_assets(
+            api=api,
+            token=token,
+            container_id=container_id,
+            verify_ssl=verify_ssl,
+            fields=set(['id', 'name']),
+            kind=None,
+            not_kind=None,
+            mode=None,
+            not_mode=None,
+            collector=None,
+            not_collector='hypervguest',
+            label=None,
+            not_label=None))
+    except KeyboardInterrupt:
+        sys.exit('Cancelled')
+    except Exception as e:
+        msg = str(e) or type(e).__name__
+        sys.exit(msg)
+
+    not_installed = {a['name']: a['id'] for a in not_installed}
+    total = len(guest_map)
+
+    for asset in installed:
+        guid = next((
+            x for x in asset['collectors']
+            if x['key'] == 'hypervguest'))['config']['guid'].upper()
+        guest_map.pop(guid, None)
+
+    if not guest_map:
+        print('No missing Hyper-V guests are found '
+              f'(installed guests: {total})')
+        sys.exit(0)
+
+    assets = []
+    for guest in guest_map.values():
+        asset = OrderedDict()
+        name = guest['ElementName']
+
+        if name in not_installed:
+            asset['id'] = not_installed[name]
+
+        asset['name'] = name
+        asset['collectors'] = [{
+            'key': 'hypervguest',
+            'config': {
+                'hypervisor': guest['_parent'],
+                'guid': guest['name'].upper(),
             },
         }]
         assets.append(asset)
@@ -1291,7 +1437,7 @@ if __name__ == '__main__':
     action_vmware_guests = \
         action.add_parser(
             'vmware-guests',
-            help='Output YAML for missing guests')
+            help='Output YAML for missing VMware guests')
 
     action_vmware_guests.add_argument('containerId', type=int)
 
@@ -1313,6 +1459,28 @@ if __name__ == '__main__':
                                         'assets will be used'
                                       ))
     action_vmware_guests.add_argument('--token',
+                                      default=None,
+                                      help='Token for authentication')
+
+    action_hyperv_guests = \
+        action.add_parser(
+            'hyperv-guests',
+            help='Output YAML for missing Hyper-V guests')
+
+    action_hyperv_guests.add_argument('containerId', type=int)
+
+    action_hyperv_guests.add_argument('-o', '--output',
+                                      choices=['json', 'yaml'],
+                                      default='yaml')
+    action_hyperv_guests.add_argument('-i', '--include',
+                                      metavar='N', type=int, nargs='+',
+                                      help=(
+                                        'Include only Hyper-V '
+                                        'assets for the lookup. If this list '
+                                        'remains empty, all Hyper-V '
+                                        'assets will be used'
+                                      ))
+    action_hyperv_guests.add_argument('--token',
                                       default=None,
                                       help='Token for authentication')
     args = parser.parse_args()
@@ -1365,6 +1533,15 @@ if __name__ == '__main__':
             args.output,
             args.token,
             args.collector,
+            args.include or None,
+        )
+    elif args.action == 'hyperv-guests':
+        hyperv_guests(
+            args.containerId,
+            args.api,
+            not args.skip_verify_ssl,
+            args.output,
+            args.token,
             args.include or None,
         )
     else:
