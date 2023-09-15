@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from setproctitle import setproctitle
 from typing import Any, Optional, Dict, List, Tuple
 
-__version__ = '0.1.12'  # Update version in setup as well
+__version__ = '0.1.13'  # Update version in setup as well
 
 
 _labels_example = """
@@ -94,6 +94,15 @@ _kinds = (
 )
 
 _modes = ('normal', 'maintenance', 'disabled')
+
+
+_apply_warning = """
+# !! IMPORTANT !!
+#   * Make sure to use -a when applying the YAML to prevent
+#     removing existing collectors.
+#   * Be sure to simulate and verify the changes
+#     using a dry-run with the -d argument
+"""
 
 
 @dataclass
@@ -1116,7 +1125,8 @@ def vmware_guests(container_id: int, api: str, verify_ssl: bool, output: str,
         msg = str(e) or type(e).__name__
         sys.exit(msg)
 
-    not_installed = {a['name']: a['id'] for a in not_installed}
+    not_installed = {
+        a['name'].lower(): (a['id'], a['name']) for a in not_installed}
     total = len(guest_map)
 
     for asset in installed:
@@ -1127,7 +1137,7 @@ def vmware_guests(container_id: int, api: str, verify_ssl: bool, output: str,
 
     if not guest_map:
         print('No missing VMware guests are found '
-              f'(installed guests: {total})')
+              f'(installed guests: {total})', file=sys.stderr)
         sys.exit(0)
 
     assets = []
@@ -1135,8 +1145,8 @@ def vmware_guests(container_id: int, api: str, verify_ssl: bool, output: str,
         asset = OrderedDict()
         name = guest['instanceName']
 
-        if name in not_installed:
-            asset['id'] = not_installed[name]
+        if name.lower() in not_installed:
+            asset['id'], name = not_installed[name.lower()]
 
         asset['name'] = name
         asset['collectors'] = [{
@@ -1158,13 +1168,7 @@ def vmware_guests(container_id: int, api: str, verify_ssl: bool, output: str,
         yaml.dump(data, sys.stdout,
                   Dumper=yamlloader.ordereddict.CDumper)
 
-        print("""
-# !! IMPORTANT !!
-#   * Make sure to use -a when applying the YAML to prevent
-#     removing existing collectors.
-#   * Be sure to simulate and verify the changes
-#     using a dry-run with the -d argument
-""")
+        print(_apply_warning)
 
 
 def hyperv_guests(container_id: int, api: str, verify_ssl: bool, output: str,
@@ -1262,7 +1266,8 @@ def hyperv_guests(container_id: int, api: str, verify_ssl: bool, output: str,
         msg = str(e) or type(e).__name__
         sys.exit(msg)
 
-    not_installed = {a['name']: a['id'] for a in not_installed}
+    not_installed = {
+        a['name'].lower(): (a['id'], a['name']) for a in not_installed}
     total = len(guest_map)
 
     for asset in installed:
@@ -1273,7 +1278,7 @@ def hyperv_guests(container_id: int, api: str, verify_ssl: bool, output: str,
 
     if not guest_map:
         print('No missing Hyper-V guests are found '
-              f'(installed guests: {total})')
+              f'(installed guests: {total})', file=sys.stderr)
         sys.exit(0)
 
     assets = []
@@ -1281,8 +1286,8 @@ def hyperv_guests(container_id: int, api: str, verify_ssl: bool, output: str,
         asset = OrderedDict()
         name = guest['ElementName']
 
-        if name in not_installed:
-            asset['id'] = not_installed[name]
+        if name.lower() in not_installed:
+            asset['id'], name = not_installed[name.lower()]
 
         asset['name'] = name
         asset['collectors'] = [{
@@ -1304,13 +1309,157 @@ def hyperv_guests(container_id: int, api: str, verify_ssl: bool, output: str,
         yaml.dump(data, sys.stdout,
                   Dumper=yamlloader.ordereddict.CDumper)
 
-        print("""
-# !! IMPORTANT !!
-#   * Make sure to use -a when applying the YAML to prevent
-#     removing existing collectors.
-#   * Be sure to simulate and verify the changes
-#     using a dry-run with the -d argument
-""")
+        print(_apply_warning)
+
+
+def unifi_devices(container_id: int, api: str, verify_ssl: bool, output: str,
+                  token: Optional[str], include: Optional[List[int]]):
+    if token is None:
+        try:
+            token = getpass.getpass('Enter user or container token: ')
+        except KeyboardInterrupt:
+            sys.exit('Cancelled')
+
+    try:
+        assets = asyncio.run(aget_assets(
+            api=api,
+            token=token,
+            container_id=container_id,
+            verify_ssl=verify_ssl,
+            fields=set(['id', 'name', 'collectors']),
+            kind=None,
+            not_kind=None,
+            mode='normal',
+            not_mode=None,
+            collector='unificontroller',
+            not_collector=None,
+            label=None,
+            not_label=None))
+    except KeyboardInterrupt:
+        sys.exit('Cancelled')
+    except Exception as e:
+        msg = str(e) or type(e).__name__
+        sys.exit(msg)
+
+    if not assets:
+        sys.exit('No assets with the unificontroller collector found')
+
+    asyncio.run(asyncio.sleep(0.5))
+
+    device_map = {}
+    for asset in assets:
+        if include and asset['id'] not in include:
+            continue
+        config = next((
+            x for x in asset['collectors']
+            if x['key'] == 'unificontroller'
+        ))['config'] or None
+
+        address = config.get('address', '') or asset['name']
+        port = config.get('port', 443) or 443
+        site = config.get('site', 'default') or 'default'
+        vssl = config.get('ssl', False)
+
+        data = asyncio.run(async_get_check_data(api, verify_ssl, asset['id'],
+                                                token, 'unificontroller',
+                                                'device'))
+        for device in data['data']['device']:
+            device['_parent'] = (address, port, site, vssl)
+            device_map[device['name'].upper()] = device  # name=guid
+
+        asyncio.run(asyncio.sleep(0.5))
+
+    try:
+        installed = asyncio.run(aget_assets(
+            api=api,
+            token=token,
+            container_id=container_id,
+            verify_ssl=verify_ssl,
+            fields=set(['id', 'collectors']),
+            kind=None,
+            not_kind=None,
+            mode=None,
+            not_mode=None,
+            collector='unifidevice',
+            not_collector=None,
+            label=None,
+            not_label=None))
+    except KeyboardInterrupt:
+        sys.exit('Cancelled')
+    except Exception as e:
+        msg = str(e) or type(e).__name__
+        sys.exit(msg)
+
+    asyncio.run(asyncio.sleep(0.5))
+
+    try:
+        not_installed = asyncio.run(aget_assets(
+            api=api,
+            token=token,
+            container_id=container_id,
+            verify_ssl=verify_ssl,
+            fields=set(['id', 'name']),
+            kind=None,
+            not_kind=None,
+            mode=None,
+            not_mode=None,
+            collector=None,
+            not_collector='unifidevice',
+            label=None,
+            not_label=None))
+    except KeyboardInterrupt:
+        sys.exit('Cancelled')
+    except Exception as e:
+        msg = str(e) or type(e).__name__
+        sys.exit(msg)
+
+    not_installed = {
+        a['name'].lower(): (a['id'], a['name']) for a in not_installed}
+    total = len(device_map)
+
+    for asset in installed:
+        mac = next((
+            x for x in asset['collectors']
+            if x['key'] == 'unifidevice'))['config']['mac'].upper()
+        device_map.pop(mac, None)
+
+    if not device_map:
+        print('No missing UniFi devices are found '
+              f'(installed devices: {total})', file=sys.stderr)
+        sys.exit(0)
+
+    assets = []
+    for device in device_map.values():
+        asset = OrderedDict()
+        name = device['device_name']
+
+        if name.lower() in not_installed:
+            asset['id'], name = not_installed[name.lower()]
+
+        asset['name'] = name
+        asset['collectors'] = [{
+            'key': 'unifidevice',
+            'config': {
+                'controller': device['_parent'][0],
+                'port': device['_parent'][1],
+                'site': device['_parent'][2],
+                'mac': device['name'].upper(),
+                'ssl': device['_parent'][3],
+            },
+        }]
+        assets.append(asset)
+
+    data = OrderedDict()
+    data['container'] = container_id
+    data['assets'] = assets
+
+    if output == 'json':
+        json.dump(data, sys.stdout)
+    elif output == 'yaml':
+        yaml.dump(data, sys.stdout,
+                  Dumper=yamlloader.ordereddict.CDumper)
+
+        print(_apply_warning)
 
 
 if __name__ == '__main__':
@@ -1483,6 +1632,28 @@ if __name__ == '__main__':
     action_hyperv_guests.add_argument('--token',
                                       default=None,
                                       help='Token for authentication')
+
+    action_unifi_devices = \
+        action.add_parser(
+            'unifi-devices',
+            help='Output YAML for missing UniFi devices')
+
+    action_unifi_devices.add_argument('containerId', type=int)
+
+    action_unifi_devices.add_argument('-o', '--output',
+                                      choices=['json', 'yaml'],
+                                      default='yaml')
+    action_unifi_devices.add_argument('-i', '--include',
+                                      metavar='N', type=int, nargs='+',
+                                      help=(
+                                        'Include only UniFi Controller '
+                                        'assets for the lookup. If this list '
+                                        'remains empty, all UniFi Controller '
+                                        'assets will be used'
+                                      ))
+    action_unifi_devices.add_argument('--token',
+                                      default=None,
+                                      help='Token for authentication')
     args = parser.parse_args()
 
     if args.version:
@@ -1537,6 +1708,15 @@ if __name__ == '__main__':
         )
     elif args.action == 'hyperv-guests':
         hyperv_guests(
+            args.containerId,
+            args.api,
+            not args.skip_verify_ssl,
+            args.output,
+            args.token,
+            args.include or None,
+        )
+    elif args.action == 'unifi-devices':
+        unifi_devices(
             args.containerId,
             args.api,
             not args.skip_verify_ssl,
