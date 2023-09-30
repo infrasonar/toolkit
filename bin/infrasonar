@@ -84,6 +84,7 @@ _kinds = (
     'NetApp',
     'PaloAlto',
     'PureStorage',
+    'Speed',
     'Supermicro',
     'Switch',
     'Synology',
