@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from setproctitle import setproctitle
 from typing import Any, Optional, Dict, List, Tuple
 
-__version__ = '0.1.13'  # Update version in setup as well
+__version__ = '0.1.14'  # Update version in setup as well
 
 
 _labels_example = """
