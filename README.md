@@ -119,7 +119,7 @@ infrasonar apply-assets missing.yaml -a -d
 
 ## UniFi devices
 
-Generate YAML (or JSON) with UniFi devices which are found on a UniFi Controller asset(s) but wherefore no asset with the `unifidevice` collector is found. This YAML can then be used to install the UniFi Device collector with a single command.
+Generate YAML (or JSON) with UniFi devices which are found on a UniFi Controller asset(s) but wherefore no asset with the `unifidevice` or `unifidevicesvc` collector is found. This YAML can then be used to install the UniFi Device collector with a single command.
 
 Example:  _(in the example below, 123 is a container Id)_
 

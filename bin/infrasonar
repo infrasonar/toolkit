@@ -3,8 +3,7 @@ import argparse
 import asyncio
 import getpass
 import json
-import os
-import pprint
+
 import re
 import sys
 import yaml
@@ -1313,14 +1312,9 @@ def hyperv_guests(container_id: int, api: str, verify_ssl: bool, output: str,
         print(_apply_warning)
 
 
-def unifi_devices(container_id: int, api: str, verify_ssl: bool, output: str,
-                  token: Optional[str], include: Optional[List[int]]):
-    if token is None:
-        try:
-            token = getpass.getpass('Enter user or container token: ')
-        except KeyboardInterrupt:
-            sys.exit('Cancelled')
-
+def _unifi_devices(container_id: int, api: str, verify_ssl: bool, token: str,
+                   include: Optional[List[int]], ucontroller: str,
+                   udevice: str):
     try:
         assets = asyncio.run(aget_assets(
             api=api,
@@ -1332,7 +1326,7 @@ def unifi_devices(container_id: int, api: str, verify_ssl: bool, output: str,
             not_kind=None,
             mode='normal',
             not_mode=None,
-            collector='unificontroller',
+            collector=ucontroller,
             not_collector=None,
             label=None,
             not_label=None))
@@ -1343,7 +1337,7 @@ def unifi_devices(container_id: int, api: str, verify_ssl: bool, output: str,
         sys.exit(msg)
 
     if not assets:
-        sys.exit('No assets with the unificontroller collector found')
+        return None, 0
 
     asyncio.run(asyncio.sleep(0.5))
 
@@ -1353,7 +1347,7 @@ def unifi_devices(container_id: int, api: str, verify_ssl: bool, output: str,
             continue
         config = next((
             x for x in asset['collectors']
-            if x['key'] == 'unificontroller'
+            if x['key'] == ucontroller
         ))['config'] or None
 
         address = config.get('address', '') or asset['name']
@@ -1362,7 +1356,7 @@ def unifi_devices(container_id: int, api: str, verify_ssl: bool, output: str,
         vssl = config.get('ssl', False)
 
         data = asyncio.run(async_get_check_data(api, verify_ssl, asset['id'],
-                                                token, 'unificontroller',
+                                                token, ucontroller,
                                                 'device'))
         for device in data['data']['device']:
             device['_parent'] = (address, port, site, vssl)
@@ -1381,7 +1375,7 @@ def unifi_devices(container_id: int, api: str, verify_ssl: bool, output: str,
             not_kind=None,
             mode=None,
             not_mode=None,
-            collector='unifidevice',
+            collector=udevice,
             not_collector=None,
             label=None,
             not_label=None))
@@ -1405,7 +1399,7 @@ def unifi_devices(container_id: int, api: str, verify_ssl: bool, output: str,
             mode=None,
             not_mode=None,
             collector=None,
-            not_collector='unifidevice',
+            not_collector=udevice,
             label=None,
             not_label=None))
     except KeyboardInterrupt:
@@ -1421,13 +1415,11 @@ def unifi_devices(container_id: int, api: str, verify_ssl: bool, output: str,
     for asset in installed:
         mac = next((
             x for x in asset['collectors']
-            if x['key'] == 'unifidevice'))['config']['mac'].upper()
+            if x['key'] == udevice))['config']['mac'].upper()
         device_map.pop(mac, None)
 
     if not device_map:
-        print('No missing UniFi devices are found '
-              f'(installed devices: {total})', file=sys.stderr)
-        sys.exit(0)
+        return [], total
 
     assets = []
     for device in device_map.values():
@@ -1439,7 +1431,7 @@ def unifi_devices(container_id: int, api: str, verify_ssl: bool, output: str,
 
         asset['name'] = name
         asset['collectors'] = [{
-            'key': 'unifidevice',
+            'key': udevice,
             'config': {
                 'controller': device['_parent'][0],
                 'port': device['_parent'][1],
@@ -1449,6 +1441,41 @@ def unifi_devices(container_id: int, api: str, verify_ssl: bool, output: str,
             },
         }]
         assets.append(asset)
+    return assets, total
+
+
+def unifi_devices(container_id: int, api: str, verify_ssl: bool, output: str,
+                  token: Optional[str], include: Optional[List[int]]):
+    if token is None:
+        try:
+            token = getpass.getpass('Enter user or container token: ')
+        except KeyboardInterrupt:
+            sys.exit('Cancelled')
+
+    assets_probe, total = _unifi_devices(
+        container_id=container_id, api=api, verify_ssl=verify_ssl,
+        token=token, include=include, ucontroller='unificontroller',
+        udevice='unifydevice')
+
+    assets_svc, _total = unifi_devices(
+        container_id=container_id, api=api, verify_ssl=verify_ssl,
+        token=token, include=include, ucontroller='unificontrollersvc',
+        udevice='unifydevicesvc')
+
+    total += _total
+
+    if assets_probe is None and assets_svc is None:
+        sys.exit('No assets with the unificontroller or unificontrollersvc '
+                 'collector found')
+
+    assets = []
+    assets.extend(assets_probe or [])
+    assets.extend(assets_svc or [])
+
+    if not assets:
+        print('No missing UniFi devices are found '
+              f'(installed devices: {total})', file=sys.stderr)
+        sys.exit(0)
 
     data = OrderedDict()
     data['container'] = container_id
