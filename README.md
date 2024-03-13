@@ -83,7 +83,7 @@ infrasonar get-assets 123 -o yaml
 
 ## VMware guests
 
-Generate YAML (or JSON) with VMware Guests which are found on ESX or vCenter but wherefore no asset with the `vmwareguest` collector is found. This YAML can then be used to install the VMware Guest collector with a single command.
+Generate YAML (or JSON) with VMware Guests which are found on ESX or vCenter but wherefore no asset with the `vmwareguest` collector is found. This YAML can then be used to install the VMware Guest collector with a single command. The default is to use the VCenter. For ESX the `-c esx` argument.
 
 Example:  _(in the example below, 123 is a container Id)_
 
@@ -119,7 +119,7 @@ infrasonar apply-assets missing.yaml -a -d
 
 ## UniFi devices
 
-Generate YAML (or JSON) with UniFi devices which are found on a UniFi Controller asset(s) but wherefore no asset with the `unifidevice` or `unifidevicesvc` collector is found. This YAML can then be used to install the UniFi Device collector with a single command.
+Generate YAML (or JSON) with UniFi devices which are found on a UniFi Controller asset(s) but wherefore no asset with the `unifidevice` or `unifidevicesvc` collector is found. This YAML can then be used to install the UniFi Device collector with a single command. The default is to use the `unificontroller`. For using the _service_ variant, use the `-c unificontrollersvc` argument.
 
 Example:  _(in the example below, 123 is a container Id)_
 
