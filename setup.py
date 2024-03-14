@@ -1,8 +1,7 @@
 """
-locan installation: pip install -e .
-
 Upload to PyPI
 
+pip -v install --use-pep517 -e .
 python setup.py sdist
 twine upload --repository pypitest dist/infrasonar-X.X.X.tar.gz
 twine upload --repository pypi dist/infrasonar-X.X.X.tar.gz
@@ -17,7 +16,7 @@ except IOError:
 
 setup(
     name='infrasonar',
-    version='0.1.14',  # Update version in infrasonar as well
+    version='0.1.15',  # Update version in infrasonar as well
     description='InfraSonar Toolkit',
     url='https://github.com/infrasonar/toolkit',
     long_description=long_description,
@@ -46,6 +45,7 @@ setup(
         'Programming Language :: Python :: 3.9',
         'Programming Language :: Python :: 3.10',
     ],
+    packages=find_packages(),
     install_requires=[
         'aiohttp',
         'pyyaml',

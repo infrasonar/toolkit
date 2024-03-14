@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from setproctitle import setproctitle
 from typing import Any, Optional, Dict, List, Tuple
 
-__version__ = '0.1.14'  # Update version in setup as well
+__version__ = '0.1.15'  # Update version in setup as well
 
 
 _labels_example = """
@@ -1457,8 +1457,8 @@ def unifi_devices(container_id: int, api: str, verify_ssl: bool, output: str,
         container_id=container_id, api=api, verify_ssl=verify_ssl,
         token=token, include=include, ucontroller=ucontroller,
         udevice=(
-            'unifydevice' if ucontroller == 'unificontrollersvc'
-            else 'unifydevicesvc')
+            'unifidevice' if ucontroller == 'unificontroller'
+            else 'unifidevicesvc')
         )
 
     if assets is None:
@@ -1494,7 +1494,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--api',
         default='https://api.infrasonar.com',
-        help='URL for the API')
+        help='URL for the API (default: https://api.infrasonar.com)')
     parser.add_argument(
         '--skip-verify-ssl',
         action='store_true',
