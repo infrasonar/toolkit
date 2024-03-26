@@ -16,7 +16,7 @@ except IOError:
 
 setup(
     name='infrasonar',
-    version='0.1.17',  # Update version in infrasonar as well
+    version='0.1.18',  # Update version in infrasonar as well
     description='InfraSonar Toolkit',
     url='https://github.com/infrasonar/toolkit',
     long_description=long_description,

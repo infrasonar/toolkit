@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from setproctitle import setproctitle
 from typing import Any, Optional, Dict, List, Tuple
 
-__version__ = '0.1.17'  # Update version in setup as well
+__version__ = '0.1.18'  # Update version in setup as well
 
 
 _labels_example = """
@@ -1313,7 +1313,7 @@ def hyperv_guests(container_id: int, api: str, verify_ssl: bool, output: str,
 
 
 def _unifi_devices(container_id: int, api: str, verify_ssl: bool, token: str,
-                   include: Optional[List[int]], ucontroller: str,
+                   include: Optional[List[int]], usite: str,
                    udevice: str):
     try:
         assets = asyncio.run(aget_assets(
@@ -1326,7 +1326,7 @@ def _unifi_devices(container_id: int, api: str, verify_ssl: bool, token: str,
             not_kind=None,
             mode='normal',
             not_mode=None,
-            collector=ucontroller,
+            collector=usite,
             not_collector=None,
             label=None,
             not_label=None))
@@ -1347,7 +1347,7 @@ def _unifi_devices(container_id: int, api: str, verify_ssl: bool, token: str,
             continue
         config = next((
             x for x in asset['collectors']
-            if x['key'] == ucontroller
+            if x['key'] == usite
         ))['config'] or None
 
         address = config.get('address', '') or asset['name']
@@ -1358,7 +1358,7 @@ def _unifi_devices(container_id: int, api: str, verify_ssl: bool, token: str,
         password = config.get('password', '')
 
         data = asyncio.run(async_get_check_data(api, verify_ssl, asset['id'],
-                                                token, ucontroller,
+                                                token, usite,
                                                 'device'))
         for device in data['data']['device']:
             device['_parent'] = (address, port, site, vssl, username, password)
@@ -1442,7 +1442,7 @@ def _unifi_devices(container_id: int, api: str, verify_ssl: bool, token: str,
                 'ssl': device['_parent'][3],
             },
         }
-        if ucontroller == 'unificontrollersvc':
+        if usite == 'unifisitesvc':
             cnf['config']['username'] = device['_parent'][4]
             cnf['config']['password'] = device['_parent'][5]
         asset['collectors'] = [cnf]
@@ -1452,7 +1452,7 @@ def _unifi_devices(container_id: int, api: str, verify_ssl: bool, token: str,
 
 
 def unifi_devices(container_id: int, api: str, verify_ssl: bool, output: str,
-                  token: Optional[str], ucontroller: str,
+                  token: Optional[str], usite: str,
                   include: Optional[List[int]]):
     if token is None:
         try:
@@ -1462,14 +1462,14 @@ def unifi_devices(container_id: int, api: str, verify_ssl: bool, output: str,
 
     assets, total = _unifi_devices(
         container_id=container_id, api=api, verify_ssl=verify_ssl,
-        token=token, include=include, ucontroller=ucontroller,
+        token=token, include=include, usite=usite,
         udevice=(
-            'unifidevice' if ucontroller == 'unificontroller'
+            'unifidevice' if usite == 'unifisite'
             else 'unifidevicesvc')
         )
 
     if assets is None:
-        sys.exit('No assets with the unificontroller or unificontrollersvc '
+        sys.exit('No assets with the unifisite or unifisitesvc '
                  'collector found')
 
     if not assets:
@@ -1674,16 +1674,16 @@ if __name__ == '__main__':
     action_unifi_devices.add_argument('-i', '--include',
                                       metavar='N', type=int, nargs='+',
                                       help=(
-                                        'Include only UniFi Controller '
+                                        'Include only UniFi Controller (Svc) '
                                         'assets for the lookup. If this list '
                                         'remains empty, all UniFi Controller '
-                                        'assets will be used'
+                                        '(Svc) assets will be used'
                                       ))
     action_unifi_devices.add_argument('-c', '--collector',
                                       choices=[
-                                        'unificontroller',
-                                        'unificontrollersvc'],
-                                      default='unificontroller',
+                                        'unifisite',
+                                        'unifisitesvc'],
+                                      default='unifisite',
                                       help=(
                                         'Use either vCenter or ESX for '
                                         'getting the guests list'))
